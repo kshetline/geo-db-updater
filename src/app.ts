@@ -1,4 +1,4 @@
-import { ExtendedRequestOptions, requestFile } from 'by-request';
+import { ExtendedRequestOptions, requestFile, requestJson } from 'by-request';
 import { StatOptions, Stats } from 'fs';
 import { readFile, rename, stat, unlink, utimes } from 'fs/promises';
 import { noop, processMillis } from '@tubular/util';
@@ -9,8 +9,7 @@ import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } fr
 
 const THREE_MONTHS = 90 * 86400 * 1000;
 
-const TIMEZONE_SHAPES_URL = 'https://github.com/evansiroky/timezone-boundary-builder/releases' +
-  '/download/2020d/timezones-with-oceans.geojson.zip';
+const TIMEZONE_RELEASE_URL = 'https://api.github.com/repos/evansiroky/timezone-boundary-builder/releases/latest';
 const TIMEZONE_SHAPES_FILE = 'cache/timezone_shapes.zip';
 const TIMEZONE_SHAPES_JSON_FILE = 'cache/timezone_shapes.json';
 
@@ -107,7 +106,13 @@ async function checkUnzip(): Promise<void> {
 }
 
 async function getTimezoneShapes(): Promise<FeatureCollection> {
-  await getPossiblyCachedFile(TIMEZONE_SHAPES_FILE, TIMEZONE_SHAPES_URL, 'Timezone shapes',
+  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, { headers: { 'User-Agent': 'GeoDB Updater ' } });
+  const asset = releaseInfo?.assets?.find((asset: any) => asset.name === 'timezones-with-oceans.geojson.zip');
+
+  if (!asset.browser_download_url)
+    throw new Error('Cannot obtain timezone shapes release info');
+
+  await getPossiblyCachedFile(TIMEZONE_SHAPES_FILE, asset.browser_download_url, 'Timezone shapes',
     { maxCacheAge: THREE_MONTHS });
 
   const statZip = await safeStat(TIMEZONE_SHAPES_FILE);
