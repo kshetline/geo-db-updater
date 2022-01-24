@@ -13,6 +13,10 @@ const TIMEZONE_RELEASE_URL = 'https://api.github.com/repos/evansiroky/timezone-b
 const TIMEZONE_SHAPES_FILE = 'cache/timezone_shapes.zip';
 const TIMEZONE_SHAPES_JSON_FILE = 'cache/timezone_shapes.json';
 
+const CITIES_500_URL = 'http://download.geonames.org/export/dump/cities500.zip';
+const CITIES_500_FILE = 'cache/cities500.zip';
+const CITIES_500_TEXT_FILE = 'cache/cities500.txt';
+
 const zoneGrid: Feature[][][] = [];
 
 for (let x = 0; x < 24; ++x) {
@@ -43,8 +47,11 @@ async function safeStat(path: string, opts?: StatOptions & { bigint?: false }): 
   }
 }
 
-async function getPossiblyCachedFile(file: string, url: string, name: string,
-                                     extraOpts?: ExtendedRequestOptions): Promise<void> {
+interface FileOpts extends ExtendedRequestOptions {
+  unzipName?: string;
+}
+
+async function getPossiblyCachedFile(file: string, url: string, name: string, extraOpts?: FileOpts): Promise<void> {
   let tickShown = false;
   let lastTick = processMillis();
   const autoTick = setInterval(() => {
@@ -66,9 +73,13 @@ async function getPossiblyCachedFile(file: string, url: string, name: string,
     }
   } };
   const stats = await safeStat(file);
+  let unzipName: string;
 
-  if (extraOpts)
+  if (extraOpts) {
+    unzipName = extraOpts.unzipName;
+    delete extraOpts.unzipName;
     Object.assign(opts, extraOpts);
+  }
 
   if (!stats)
     console.log(`Retrieving ${name}`);
@@ -87,6 +98,42 @@ async function getPossiblyCachedFile(file: string, url: string, name: string,
         console.log(`Updating ${name}`);
       else
         console.log(`Using cached ${name}`);
+    }
+
+    if (unzipName) {
+      const statZip = await safeStat(file);
+      const statUnzip = await safeStat(unzipName);
+
+      if (!statUnzip || abs(statUnzip.mtimeMs - statZip.mtimeMs) > 2000) {
+        console.log(`Unzipping ${name}`);
+
+        if (statUnzip)
+          await unlink(unzipName);
+
+        let zipProc = spawn('unzip', ['-Z1', file]);
+        let originalZipName = '';
+
+        await new Promise<void>(resolve => {
+          zipProc.once('error', () => resolve());
+          zipProc.stdout.on('data', data => originalZipName += data.toString());
+          zipProc.stdout.once('end', () => resolve());
+        });
+
+        originalZipName = filePath.join('cache', originalZipName.trim());
+        await unlink(originalZipName).catch(noop);
+
+        zipProc = spawn('unzip', [file, '-d', 'cache']);
+
+        await new Promise<void>(resolve => {
+          zipProc.once('error', () => resolve());
+          zipProc.stdout.once('end', () => resolve());
+        });
+
+        await rename(originalZipName, unzipName);
+        await utimes(unzipName, statZip.mtime, statZip.mtime);
+      }
+      else
+        console.log(`Using cached unzipped ${name}`);
     }
   }
   catch (err) {
@@ -113,41 +160,7 @@ async function getTimezoneShapes(): Promise<FeatureCollection> {
     throw new Error('Cannot obtain timezone shapes release info');
 
   await getPossiblyCachedFile(TIMEZONE_SHAPES_FILE, asset.browser_download_url, 'Timezone shapes',
-    { maxCacheAge: THREE_MONTHS });
-
-  const statZip = await safeStat(TIMEZONE_SHAPES_FILE);
-  const statJson = await safeStat(TIMEZONE_SHAPES_JSON_FILE);
-
-  if (!statJson || abs(statJson.mtimeMs - statZip.mtimeMs) > 2000) {
-    console.log('Unzipping timezone shapes');
-
-    if (statJson)
-      await unlink(TIMEZONE_SHAPES_JSON_FILE);
-
-    let zipProc = spawn('unzip', ['-Z1', TIMEZONE_SHAPES_FILE]);
-    let unzipName = '';
-
-    await new Promise<void>(resolve => {
-      zipProc.once('error', () => resolve());
-      zipProc.stdout.on('data', data => unzipName += data.toString());
-      zipProc.stdout.once('end', () => resolve());
-    });
-
-    unzipName = filePath.join('cache', unzipName.trim());
-    await unlink(unzipName).catch(noop);
-
-    zipProc = spawn('unzip', [TIMEZONE_SHAPES_FILE, '-d', 'cache']);
-
-    await new Promise<void>(resolve => {
-      zipProc.once('error', () => resolve());
-      zipProc.stdout.once('end', () => resolve());
-    });
-
-    await rename(unzipName, TIMEZONE_SHAPES_JSON_FILE);
-    await utimes(TIMEZONE_SHAPES_JSON_FILE, statZip.mtime, statZip.mtime);
-  }
-  else
-    console.log(`Using cached timezone_shapes.json`);
+    { maxCacheAge: THREE_MONTHS, unzipName: TIMEZONE_SHAPES_JSON_FILE });
 
   const shapesJson = await readFile(TIMEZONE_SHAPES_JSON_FILE, 'utf8');
 
@@ -174,6 +187,11 @@ function presortTimezones(timezones: FeatureCollection): void {
   });
 }
 
+async function getGeoData(): Promise<void> {
+  await getPossiblyCachedFile(CITIES_500_FILE, CITIES_500_URL, 'Cities-500',
+    { maxCacheAge: THREE_MONTHS, unzipName: CITIES_500_TEXT_FILE });
+}
+
 (async (): Promise<void> => {
   try {
     await checkUnzip();
@@ -189,6 +207,8 @@ function presortTimezones(timezones: FeatureCollection): void {
     console.log(findTimezone(-31.5546, 159.082)); // Lord Howe Island
     console.log(findTimezone(30.0167, 31.2167)); // Giza
     console.log(findTimezone(39.7684, -86.158)); // Indianapolis
+
+    await getGeoData();
   }
   catch (err) {
     console.error(err);
