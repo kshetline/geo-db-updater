@@ -1,21 +1,35 @@
-import { ExtendedRequestOptions, requestFile, requestJson } from 'by-request';
-import { StatOptions, Stats } from 'fs';
-import { readFile, rename, stat, unlink, utimes } from 'fs/promises';
-import { noop, processMillis } from '@tubular/util';
-import { abs, floor, mod } from '@tubular/math';
+import { requestJson } from 'by-request';
+import { createReadStream } from 'fs';
+import { readFile } from 'fs/promises';
+import { toBoolean, toNumber } from '@tubular/util';
+import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
-import filePath from 'path';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
+import * as readline from 'readline';
+import { Pool } from './mysql-await-async';
+import { initGazetteer, ProcessedNames, processPlaceNames } from './gazetteer';
+import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 
-const THREE_MONTHS = 90 * 86400 * 1000;
+const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
 
 const TIMEZONE_RELEASE_URL = 'https://api.github.com/repos/evansiroky/timezone-boundary-builder/releases/latest';
 const TIMEZONE_SHAPES_FILE = 'cache/timezone_shapes.zip';
 const TIMEZONE_SHAPES_JSON_FILE = 'cache/timezone_shapes.json';
 
-const CITIES_500_URL = 'http://download.geonames.org/export/dump/cities500.zip';
-const CITIES_500_FILE = 'cache/cities500.zip';
-const CITIES_500_TEXT_FILE = 'cache/cities500.txt';
+const CITIES_15000_URL = 'https://download.geonames.org/export/dump/cities15000.zip';
+const CITIES_15000_FILE = 'cache/cities15000.zip';
+const CITIES_15000_TEXT_FILE = 'cache/cities15000.txt';
+
+const ALL_COUNTRIES_URL = 'https://download.geonames.org/export/dump/allCountries.zip';
+const ALL_COUNTRIES_FILE = 'cache/all-countries.zip';
+const ALL_COUNTRIES_TEXT_FILE = 'cache/all-countries.txt';
+
+export const pool = new Pool({
+  host: (toBoolean(process.env.DB_REMOTE) ? 'skyviewcafe.com' : '127.0.0.1'),
+  user: 'skyview',
+  password: process.env.DB_PWD,
+  database: 'skyviewcafe'
+});
 
 const zoneGrid: Feature[][][] = [];
 
@@ -26,6 +40,7 @@ for (let x = 0; x < 24; ++x) {
     zoneGrid[x][y] = [];
 }
 
+/* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function findTimezone(lat: number, lon: number): string {
   const x = floor(mod(lon, 360) / 15);
   const y = floor((lat + 90) / 15);
@@ -36,110 +51,6 @@ function findTimezone(lat: number, lon: number): string {
   }
 
   return null;
-}
-
-async function safeStat(path: string, opts?: StatOptions & { bigint?: false }): Promise<Stats> {
-  try {
-    return await stat(path, opts);
-  }
-  catch {
-    return null;
-  }
-}
-
-interface FileOpts extends ExtendedRequestOptions {
-  unzipName?: string;
-}
-
-async function getPossiblyCachedFile(file: string, url: string, name: string, extraOpts?: FileOpts): Promise<void> {
-  let tickShown = false;
-  let lastTick = processMillis();
-  const autoTick = setInterval(() => {
-    const now = processMillis();
-
-    if (now > lastTick + 500) {
-      tickShown = true;
-      process.stdout.write('◦');
-      lastTick = now;
-    }
-  }, 1500);
-  const opts: ExtendedRequestOptions = { cachePath: file, progress: () => {
-    const now = processMillis();
-
-    if (now > lastTick + 500) {
-      tickShown = true;
-      process.stdout.write('•');
-      lastTick = now;
-    }
-  } };
-  const stats = await safeStat(file);
-  let unzipName: string;
-
-  if (extraOpts) {
-    unzipName = extraOpts.unzipName;
-    delete extraOpts.unzipName;
-    Object.assign(opts, extraOpts);
-  }
-
-  if (!stats)
-    console.log(`Retrieving ${name}`);
-
-  try {
-    await requestFile(url, opts, file);
-    clearInterval(autoTick);
-
-    if (tickShown)
-      process.stdout.write('\n');
-
-    const postStats = await safeStat(file);
-
-    if (stats) {
-      if (postStats.mtimeMs > stats.mtimeMs)
-        console.log(`Updating ${name}`);
-      else
-        console.log(`Using cached ${name}`);
-    }
-
-    if (unzipName) {
-      const statZip = await safeStat(file);
-      const statUnzip = await safeStat(unzipName);
-
-      if (!statUnzip || abs(statUnzip.mtimeMs - statZip.mtimeMs) > 2000) {
-        console.log(`Unzipping ${name}`);
-
-        if (statUnzip)
-          await unlink(unzipName);
-
-        let zipProc = spawn('unzip', ['-Z1', file]);
-        let originalZipName = '';
-
-        await new Promise<void>(resolve => {
-          zipProc.once('error', () => resolve());
-          zipProc.stdout.on('data', data => originalZipName += data.toString());
-          zipProc.stdout.once('end', () => resolve());
-        });
-
-        originalZipName = filePath.join('cache', originalZipName.trim());
-        await unlink(originalZipName).catch(noop);
-
-        zipProc = spawn('unzip', [file, '-d', 'cache']);
-
-        await new Promise<void>(resolve => {
-          zipProc.once('error', () => resolve());
-          zipProc.stdout.once('end', () => resolve());
-        });
-
-        await rename(originalZipName, unzipName);
-        await utimes(unzipName, statZip.mtime, statZip.mtime);
-      }
-      else
-        console.log(`Using cached unzipped ${name}`);
-    }
-  }
-  catch (err) {
-    console.error(`Failed to acquire ${name}. Will used archived copy.`);
-    await readFile(file.replace(/^cache\//, 'archive/'), 'utf-8');
-  }
 }
 
 async function checkUnzip(): Promise<void> {
@@ -153,7 +64,7 @@ async function checkUnzip(): Promise<void> {
 }
 
 async function getTimezoneShapes(): Promise<FeatureCollection> {
-  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, { headers: { 'User-Agent': 'GeoDB Updater ' } });
+  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, { headers: { 'User-Agent': FAKE_USER_AGENT } });
   const asset = releaseInfo?.assets?.find((asset: any) => asset.name === 'timezones-with-oceans.geojson.zip');
 
   if (!asset.browser_download_url)
@@ -188,27 +99,54 @@ function presortTimezones(timezones: FeatureCollection): void {
 }
 
 async function getGeoData(): Promise<void> {
-  await getPossiblyCachedFile(CITIES_500_FILE, CITIES_500_URL, 'Cities-500',
-    { maxCacheAge: THREE_MONTHS, unzipName: CITIES_500_TEXT_FILE });
+  await getPossiblyCachedFile(CITIES_15000_FILE, CITIES_15000_URL, 'cities-15000',
+    { maxCacheAge: THREE_MONTHS, unzipName: CITIES_15000_TEXT_FILE });
+  await getPossiblyCachedFile(ALL_COUNTRIES_FILE, ALL_COUNTRIES_URL, 'all-countries',
+    { maxCacheAge: THREE_MONTHS, unzipName: ALL_COUNTRIES_TEXT_FILE });
+}
+
+const places: ProcessedNames[] = [];
+
+async function readGeoData(file: string): Promise<void> {
+  await initGazetteer();
+
+  const inStream = createReadStream(file, 'utf8');
+  const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+
+  for await (const line of lines) {
+    const parts = line.split('\t');
+    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    let [geonameId, name, asciiName, altNames, , , featureClass, featureCode,
+    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         countryCode, , admin1, admin2, , , , , , timezone] = parts;
+
+    if (!name)
+      continue;
+
+    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
+    const processed = processPlaceNames(name, admin2, admin1, countryCode);
+
+    if (processed)
+      places.push(processed);
+  }
+
+  console.log(places.length);
 }
 
 (async (): Promise<void> => {
   try {
     await checkUnzip();
 
-    const timezones = await getTimezoneShapes();
+    if (Date.now() < 0) {
+      const timezones = await getTimezoneShapes();
 
-    timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
-    presortTimezones(timezones);
-
-    console.log(findTimezone(42.7564, -71.4667)); // NYC
-    console.log(findTimezone(41.85, -87.65)); // Chicago
-    console.log(findTimezone(42.7564, -71.4667)); // Nashua
-    console.log(findTimezone(-31.5546, 159.082)); // Lord Howe Island
-    console.log(findTimezone(30.0167, 31.2167)); // Giza
-    console.log(findTimezone(39.7684, -86.158)); // Indianapolis
+      timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
+      presortTimezones(timezones);
+    }
 
     await getGeoData();
+    await readGeoData(CITIES_15000_TEXT_FILE);
   }
   catch (err) {
     console.error(err);

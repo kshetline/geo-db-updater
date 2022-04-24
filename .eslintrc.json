@@ -71,6 +71,7 @@
     "no-mixed-operators": "off",
     "no-multi-spaces": "off",
     "no-new": "off",
+    "node/no-callback-literal": "off",
     "no-return-assign": "off",
     "no-unexpected-multiline": "off",
     "no-unused-expressions": "off",

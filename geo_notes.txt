@@ -1,0 +1,341 @@
+Zürich (Kreis xxx)
+Wetzikon
+Affoltern
+Obfelden
+Kloten
+Glattbrugg
+Bülach
+Embrach
+Niederglatt
+Adliswil
+Dübendorf
+Seen (Kreis xxx)
+Urdorf
+Erlenbach
+Hombrechtikon
+Schwerzenbach
+Obfelden
+Kloten
+Wallisellen
+Buchs
+Dällikon
+Niederglatt
+Oberglatt
+Regensdorf
+Rümlang
+
+
+Discard: Elsau-Räterschen / Räterschen ZH CH Elsau-Raeterschen / Raeterschen 1071
+Discard: Oetwil / Oetwil an der Limmat ZH CH Oetwil / Oetwil an der Limmat 513
+Remove extras: Wetzikon / Ober-Wetzikon -> Wetzikon ::: ZH CH Wetzikon / Ober-Wetzikon 3858
+Discard: Illnau / Ober-Illnau ZH CH Illnau / Ober-Illnau 953
+Discard: Niederweningen / Niederweningen (Dorf) ZH CH Niederweningen / Niederweningen (Dorf) 733
+Remove extras: Neftenbach / Dorf Neftenbach -> Neftenbach ::: ZH CH Neftenbach / Dorf Neftenbach 3171
+Remove extras: Langnau / Langnau (Dorf) -> Langnau ::: ZH CH Langnau / Langnau (Dorf) 4745
+Discard: Pfäffikon / Irgenhausen ZH CH Pfaeffikon / Irgenhausen 2032
+Remove extras: Zürich (Kreis 10) / Höngg -> / ::: ZH CH Zuerich (Kreis 10) / Hoengg 17117
+Discard: Hittnau / Hittnau (Dorf) ZH CH Hittnau / Hittnau (Dorf) 1502
+Discard: Oberwinterthur (Kreis 2) / Hegi ZH CH Oberwinterthur (Kreis 2) / Hegi 1539
+Remove extras: Hausen am Albis / Hausen (Dorf) -> Hausen am Albis ::: ZH CH Hausen am Albis / Hausen (Dorf) 3253
+Remove extras: Dietlikon / Dietlikon (Dorf) -> Dietlikon ::: ZH CH Dietlikon / Dietlikon (Dorf) 6149
+Remove extras: Zürich (Kreis 4) / Aussersihl -> / ::: ZH CH Zuerich (Kreis 4) / Aussersihl 27273
+Discard: Aeugst / Aeugst (Dorf) ZH CH Aeugst / Aeugst (Dorf) 975
+Remove extras: Wettswil / Wettswil (Dorf) -> Wettswil ::: ZH CH Wettswil / Wettswil (Dorf) 3605
+Discard: Hausen / Heisch ZH CH Hausen / Heisch 901
+Discard: Marthalen / Dorfkern ZH CH Marthalen / Dorfkern 603
+Discard: Dietlikon / Eichwiesen ZH CH Dietlikon / Eichwiesen 1386
+Discard: Seglingen / Ober-Seglingen ZH CH Seglingen / Ober-Seglingen 503
+Remove extras: Rümlang / Rümlang (Dorfkern) -> Rümlang ::: ZH CH Ruemlang / Ruemlang (Dorfkern) 3528
+Discard: Rümlang / Säntisstrasse-Aegler ZH CH Ruemlang / Saentisstrasse-Aegler 767
+Discard: Rümlang / Huebacher ZH CH Ruemlang / Huebacher 712
+Discard: Steinmaur / Nieder-Steinmaur ZH CH Steinmaur / Nieder-Steinmaur 600
+Discard: Weiach / Weiach (Dorfkern) ZH CH Weiach / Weiach (Dorfkern) 827
+Discard: Bubikon / Station ZH CH Bubikon / Station 732
+Discard: Tann / Tann (Dorfkern) ZH CH Tann / Tann (Dorfkern) 2080
+Remove extras: Rüti / Westlicher Dorfteil -> Rüti ::: ZH CH Rueti / Westlicher Dorfteil 3083
+Remove extras: Rüti / Dorfzentrum, Südl. Teil -> Rüti ::: ZH CH Rueti / Dorfzentrum, Suedl. Teil 3618
+Remove extras: Rüti / Oberdorf -> Rüti ::: ZH CH Rueti / Oberdorf 2875
+Discard: Wetzikon / Robenhausen ZH CH Wetzikon / Robenhausen 2213
+Remove extras: Wetzikon / Kempten -> Wetzikon ::: ZH CH Wetzikon / Kempten 4377
+Remove extras: Adliswil / Adliswil (Stadtkern) -> Adliswil ::: ZH CH Adliswil / Adliswil (Stadtkern) 2538
+Discard: Horgen / Käpfnach ZH CH Horgen / Kaepfnach 810
+Remove extras: Horgen / Allmend -> Horgen ::: ZH CH Horgen / Allmend 3809
+Remove extras: Horgen / Scheller-Stockerstrasse -> Horgen ::: ZH CH Horgen / Scheller-Stockerstrasse 2690
+Remove extras: Horgen / Oberdorf -> Horgen ::: ZH CH Horgen / Oberdorf 2524
+Discard: Kilchberg / Hornhalden ZH CH Kilchberg / Hornhalden 709
+Discard: Kilchberg / Bächler-Stocken ZH CH Kilchberg / Baechler-Stocken 1147
+Discard: Kilchberg / Bendlikon ZH CH Kilchberg / Bendlikon 552
+Discard: Kilchberg / Kilchberg (Dorfkern) ZH CH Kilchberg / Kilchberg (Dorfkern) 2244
+Discard: Kilchberg / Schwanden ZH CH Kilchberg / Schwanden 852
+Discard: Langnau / Vitaquartier ZH CH Langnau / Vitaquartier 1161
+Discard: Oberrieden / Mitte ZH CH Oberrieden / Mitte 1807
+Discard: Oberrieden / Berg ZH CH Oberrieden / Berg 1961
+Discard: Richterswil / Dorfkern ZH CH Richterswil / Dorfkern 1216
+Remove extras: Richterswil / Richterswil (Dorfkern) -> Richterswil ::: ZH CH Richterswil / Richterswil (Dorfkern) 3292
+Discard: Richterswil / Burghalde ZH CH Richterswil / Burghalde 1137
+Discard: Rüschlikon / Alte Landstrasse ZH CH Rueschlikon / Alte Landstrasse 546
+Remove extras: Thalwil / Dorfkern -> Thalwil ::: ZH CH Thalwil / Dorfkern 6829
+Discard: Thalwil / Berg ZH CH Thalwil / Berg 1568
+Discard: Thalwil / Nord ZH CH Thalwil / Nord 1751
+Discard: Thalwil / Süd ZH CH Thalwil / Sued 1255
+Remove extras: Wädenswil / Dorf (Wädenswil) -> Wädenswil ::: ZH CH Waedenswil / Dorf (Waedenswil) 2556
+Discard: Au / Unter-Dorf ZH CH Au / Unter-Dorf 1249
+Remove extras: Au / Mittel-Dorf -> Au ::: ZH CH Au / Mittel-Dorf 2562
+Discard: Au / Ober-Ort/Gwad ZH CH Au / Ober-Ort/Gwad 979
+Discard: Wädenswil / Hangenmoos ZH CH Waedenswil / Hangenmoos 1407
+Remove extras: Wädenswil / Büelen -> Wädenswil ::: ZH CH Waedenswil / Bueelen 2710
+Discard: Wädenswil / Untermosen-Fuhr ZH CH Waedenswil / Untermosen-Fuhr 1976
+Discard: Wädenswil / Leihof-Mühlebach ZH CH Waedenswil / Leihof-Muehlebach 1830
+Discard: Wädenswil / Eichweid ZH CH Waedenswil / Eichweid 1252
+Discard: Wädenswil / Boller-Giessen ZH CH Waedenswil / Boller-Giessen 1538
+Discard: Erlenbach / rechts des Dorfbachs unterhalb Bahnlinie ZH CH Erlenbach / rechts des Dorfbachs unterhalb Bahnlinie 611
+Discard: Erlenbach / rechts des Dorfbachs oberhalb Bahnlinie ZH CH Erlenbach / rechts des Dorfbachs oberhalb Bahnlinie 1470
+Discard: Erlenbach / links des Dorfbachs unterhalb Bahnlinie ZH CH Erlenbach / links des Dorfbachs unterhalb Bahnlinie 729
+Discard: Erlenbach / links des Dorfbachs oberhalb Bahnlinie ZH CH Erlenbach / links des Dorfbachs oberhalb Bahnlinie 1709
+Discard: Hombrechtikon / Bochslen ZH CH Hombrechtikon / Bochslen 704
+Discard: Hombrechtikon / Eichberg ZH CH Hombrechtikon / Eichberg 571
+Discard: Hombrechtikon / Tobel ZH CH Hombrechtikon / Tobel 897
+Discard: Hombrechtikon / Grossacher ZH CH Hombrechtikon / Grossacher 696
+Discard: Küsnacht / Dorf ZH CH Kuesnacht / Dorf 1574
+Remove extras: Küsnacht / Goldbach -> Küsnacht ::: ZH CH Kuesnacht / Goldbach 2607
+Discard: Küsnacht / Itschnach ZH CH Kuesnacht / Itschnach 2397
+Discard: Küsnacht / Schiedhalden ZH CH Kuesnacht / Schiedhalden 1033
+Remove extras: Küsnacht / Heslibach -> Küsnacht ::: ZH CH Kuesnacht / Heslibach 3228
+Discard: Küsnacht / Allmend ZH CH Kuesnacht / Allmend 686
+Remove extras: Männedorf / Dorfkern -> Männedorf ::: ZH CH Maennedorf / Dorfkern 4893
+Discard: Männedorf / Ausserfeld ZH CH Maennedorf / Ausserfeld 1175
+Discard: Meilen / Halten ZH CH Meilen / Halten 508
+Discard: Oetwil / Zelgliacker ZH CH Oetwil / Zelgliacker 718
+Discard: Oetwil / Vogelsang ZH CH Oetwil / Vogelsang 599
+Discard: Uetikon / Grossdorf ZH CH Uetikon / Grossdorf 1040
+Discard: Uetikon / Chlidorf ZH CH Uetikon / Chlidorf 817
+Discard: Zumikon / Fröschgüllen ZH CH Zumikon / Froeschguellen 526
+Remove extras: Effretikon / Watt -> Effretikon ::: ZH CH Effretikon / Watt 2632
+Discard: Effretikon / Brandenriet / Vogelsang ZH CH Effretikon / Brandenriet / Vogelsang 793
+Discard: Effretikon / Moosburg ZH CH Effretikon / Moosburg 781
+Discard: Effretikon / Rappenhalde-Bannhalde ZH CH Effretikon / Rappenhalde-Bannhalde 1758
+Remove extras: Pfäffikon / Pfäffikon (Dorfkern) -> Pfäffikon ::: ZH CH Pfaeffikon / Pfaeffikon (Dorfkern) 5595
+Discard: Gockhausen / Meisenrain ZH CH Gockhausen / Meisenrain 598
+Discard: Greifensee / Ocht ZH CH Greifensee / Ocht 980
+Discard: Greifensee / Müllerwis / Seilerwis ZH CH Greifensee / Muellerwis / Seilerwis 1064
+Discard: Greifensee / Pfisterhölzli ZH CH Greifensee / Pfisterhoelzli 1135
+Discard: Ebmatingen / Bachtobel ZH CH Ebmatingen / Bachtobel 782
+Discard: Ebmatingen / Lebern ZH CH Ebmatingen / Lebern 571
+Discard: Mönchaltorf / Dorf ZH CH Moenchaltorf / Dorf 1077
+Discard: Mönchaltorf / Hohfurren ZH CH Moenchaltorf / Hohfurren 534
+Discard: Schwerzenbach / Chimli ZH CH Schwerzenbach / Chimli 1020
+Discard: Schwerzenbach / Blatten ZH CH Schwerzenbach / Blatten 1078
+Discard: Schwerzenbach / Chropfacher ZH CH Schwerzenbach / Chropfacher 699
+Discard: Schwerzenbach / Widacher ZH CH Schwerzenbach / Widacher 504
+Remove extras: Uster / Kirch-Uster -> Uster ::: ZH CH Uster / Kirch-Uster 10428
+Remove extras: Uster / Nieder-Uster -> Uster ::: ZH CH Uster / Nieder-Uster 4128
+Discard: Uster / Gschwader ZH CH Uster / Gschwader 1763
+Remove extras: Uster / Ober-Uster -> Uster ::: ZH CH Uster / Ober-Uster 5100
+Discard: Uster / Nossikon ZH CH Uster / Nossikon 1433
+Discard: Nänikon / Nänikon (Dorfkern) ZH CH Naenikon / Naenikon (Dorfkern) 1178
+Discard: Kindhausen / Kindhausen (Dorf) ZH CH Kindhausen / Kindhausen (Dorf) 1107
+Remove extras: Hegnau / Sunnebüel-Eich -> Hegnau ::: ZH CH Hegnau / Sunnebueel-Eich 3250
+Discard: Hegnau / Alt-Hegnau ZH CH Hegnau / Alt-Hegnau 703
+Remove extras: Hegnau / Dammboden-Grindel -> Hegnau ::: ZH CH Hegnau / Dammboden-Grindel 2817
+Discard: Hegnau / Im Zentrum ZH CH Hegnau / Im Zentrum 942
+Discard: Zimikon / Rütiwies ZH CH Zimikon / Ruetiwies 518
+Discard: Elgg / Städtchen und Umgebung ZH CH Elgg / Staedtchen und Umgebung 2342
+Discard: Elgg / Neu-Elgg ZH CH Elgg / Neu-Elgg 940
+Discard: Hettlingen / Dorfkern ZH CH Hettlingen / Dorfkern 814
+Discard: Hettlingen / Gübel ZH CH Hettlingen / Guebel 664
+Discard: Seuzach Dorf / Hochgrüt-Scheidweg ZH CH Seuzach Dorf / Hochgruet-Scheidweg 985
+Discard: Seuzach Dorf / Pünten-Ifang ZH CH Seuzach Dorf / Puenten-Ifang 504
+Discard: Seuzach Dorf / Breite-Weid ZH CH Seuzach Dorf / Breite-Weid 1016
+Discard: Seuzach Dorf / Brandbüel ZH CH Seuzach Dorf / Brandbueel 765
+Discard: Wiesendangen / Steinegg ZH CH Wiesendangen / Steinegg 599
+Discard: Stadt Winterthur (Kreis 1) / Altstadt ZH CH Stadt Winterthur (Kreis 1) / Altstadt 1665
+Remove extras: Stadt Winterthur (Kreis 1) / Lind -> / ::: ZH CH Stadt Winterthur (Kreis 1) / Lind 4617
+Remove extras: Stadt Winterthur (Kreis 1) / Heiligberg -> / ::: ZH CH Stadt Winterthur (Kreis 1) / Heiligberg 3034
+Discard: Stadt Winterthur (Kreis 1) / Tössfeld ZH CH Stadt Winterthur (Kreis 1) / Toessfeld 2207
+Discard: Stadt Winterthur (Kreis 1) / Brühlberg ZH CH Stadt Winterthur (Kreis 1) / Bruehlberg 1476
+Remove extras: Stadt Winterthur (Kreis 1) / Neuwiesen -> / ::: ZH CH Stadt Winterthur (Kreis 1) / Neuwiesen 3149
+Remove extras: Oberwinterthur (Kreis 2) / Talacker -> / ::: ZH CH Oberwinterthur (Kreis 2) / Talacker 5375
+Remove extras: Oberwinterthur (Kreis 2) / Guggenbühl -> / ::: ZH CH Oberwinterthur (Kreis 2) / Guggenbuehl 5376
+Discard: Oberwinterthur (Kreis 2) / Grüze ZH CH Oberwinterthur (Kreis 2) / Grueze 575
+Discard: Oberwinterthur (Kreis 2) / Hegmatten ZH CH Oberwinterthur (Kreis 2) / Hegmatten 820
+Discard: Oberwinterthur (Kreis 2) / Zinzikon ZH CH Oberwinterthur (Kreis 2) / Zinzikon 1842
+Remove extras: Seen (Kreis 3) / Waser -> / ::: ZH CH Seen (Kreis 3) / Waser 4088
+Remove extras: Seen (Kreis 3) / Büelwiesen -> / ::: ZH CH Seen (Kreis 3) / Bueelwiesen 2632
+Discard: Seen (Kreis 3) / Iberg ZH CH Seen (Kreis 3) / Iberg 548
+Discard: Seen (Kreis 3) / Waldegg ZH CH Seen (Kreis 3) / Waldegg 1184
+Discard: Seen (Kreis 3) / Ganzenbühl ZH CH Seen (Kreis 3) / Ganzenbuehl 2362
+Discard: Seen (Kreis 3) / Sonnenberg ZH CH Seen (Kreis 3) / Sonnenberg 743
+Discard: Seen (Kreis 3) / Oberseen ZH CH Seen (Kreis 3) / Oberseen 2133
+Discard: Töss (Kreis 4) / Vorder-Dättnau ZH CH Toess (Kreis 4) / Vorder-Daettnau 1476
+Discard: Töss (Kreis 4) / Steig ZH CH Toess (Kreis 4) / Steig 745
+Remove extras: Töss (Kreis 4) / Schlosstal -> / ::: ZH CH Toess (Kreis 4) / Schlosstal 2762
+Remove extras: Töss (Kreis 4) / Eichliacker -> / ::: ZH CH Toess (Kreis 4) / Eichliacker 3626
+Remove extras: Veltheim (Kreis 5) / Rosenberg -> / ::: ZH CH Veltheim (Kreis 5) / Rosenberg 4765
+Remove extras: Veltheim (Kreis 5) / Blumenau -> / ::: ZH CH Veltheim (Kreis 5) / Blumenau 4135
+Discard: Wülflingen (Kreis 6) / Weinberg ZH CH Wuelflingen (Kreis 6) / Weinberg 951
+Remove extras: Wülflingen (Kreis 6) / Oberfeld -> / ::: ZH CH Wuelflingen (Kreis 6) / Oberfeld 4288
+Remove extras: Wülflingen (Kreis 6) / Lindenplatz -> / ::: ZH CH Wuelflingen (Kreis 6) / Lindenplatz 2555
+Discard: Wülflingen (Kreis 6) / Niederfeld ZH CH Wuelflingen (Kreis 6) / Niederfeld 1227
+Remove extras: Wülflingen (Kreis 6) / Härti -> / ::: ZH CH Wuelflingen (Kreis 6) / Haerti 2602
+Remove extras: Mattenbach (Kreis 7) / Deutweg -> / ::: ZH CH Mattenbach (Kreis 7) / Deutweg 5930
+Remove extras: Mattenbach (Kreis 7) / Gutschick -> / ::: ZH CH Mattenbach (Kreis 7) / Gutschick 2923
+Discard: Mattenbach (Kreis 7) / Endliker ZH CH Mattenbach (Kreis 7) / Endliker 2169
+Discard: Kollbrunn / Kollbrunn (Dorfkern) ZH CH Kollbrunn / Kollbrunn (Dorfkern) 1040
+Discard: Rikon / Rikon (Dorfkern) ZH CH Rikon / Rikon (Dorfkern) 850
+Discard: Birmensdorf / Haslen ZH CH Birmensdorf / Haslen 669
+Remove extras: Dietikon / Vorstadt -> Dietikon ::: ZH CH Dietikon / Vorstadt 2619
+Discard: Dietikon / Unterdorf ZH CH Dietikon / Unterdorf 748
+Discard: Dietikon / Fondli ZH CH Dietikon / Fondli 966
+Discard: Dietikon / Almend ZH CH Dietikon / Almend 2118
+Remove extras: Dietikon / Oberdorf -> Dietikon ::: ZH CH Dietikon / Oberdorf 4147
+Discard: Dietikon / Kreuzacker ZH CH Dietikon / Kreuzacker 1955
+Discard: Dietikon / Rütematt ZH CH Dietikon / Ruetematt 751
+Discard: Dietikon / Guggenbühl ZH CH Dietikon / Guggenbuehl 1312
+Remove extras: Dietikon / Hofacker -> Dietikon ::: ZH CH Dietikon / Hofacker 2826
+Discard: Dietikon / Schönenwerd ZH CH Dietikon / Schoenenwerd 1218
+Discard: Geroldswil / Huebwiesen ZH CH Geroldswil / Huebwiesen 996
+Discard: Geroldswil / Bergacker ZH CH Geroldswil / Bergacker 588
+Discard: Geroldswil / Haslern ZH CH Geroldswil / Haslern 601
+Discard: Fahrweid (nördl. Teil) / Fahrweid ZH CH Fahrweid (noerdl. Teil) / Fahrweid 660
+Discard: Oberengstringen / Zentrum ZH CH Oberengstringen / Zentrum 1271
+Discard: Oberengstringen / Sonnenberg ZH CH Oberengstringen / Sonnenberg 1477
+Discard: Oberengstringen / Rauchacher ZH CH Oberengstringen / Rauchacher 1126
+Discard: Oberengstringen / Eggbühl ZH CH Oberengstringen / Eggbuehl 843
+Discard: Oberengstringen / Kirchweg ZH CH Oberengstringen / Kirchweg 948
+Discard: Schlieren / Zentrum ZH CH Schlieren / Zentrum 1207
+Discard: Schlieren / Engstringerquartier ZH CH Schlieren / Engstringerquartier 1877
+Remove extras: Schlieren / Spital -> Schlieren ::: ZH CH Schlieren / Spital 2587
+Discard: Schlieren / Pflugstrasse ZH CH Schlieren / Pflugstrasse 704
+Discard: Schlieren / Freiestrasse ZH CH Schlieren / Freiestrasse 1212
+Discard: Schlieren / Kamp ZH CH Schlieren / Kamp 1129
+Discard: Schlieren / Boden ZH CH Schlieren / Boden 1241
+Discard: Schlieren / Halde ZH CH Schlieren / Halde 570
+Discard: Schlieren / Industrie Ost ZH CH Schlieren / Industrie Ost 507
+Discard: Uitikon / Uitikon (Dorfkern) ZH CH Uitikon / Uitikon (Dorfkern) 640
+Discard: Uitikon / Halde ZH CH Uitikon / Halde 633
+Discard: Uitikon / Waldegg ZH CH Uitikon / Waldegg 850
+Discard: Urdorf / Nieder-Urdorf ZH CH Urdorf / Nieder-Urdorf 749
+Discard: Urdorf / Bodenfeld ZH CH Urdorf / Bodenfeld 1840
+Discard: Urdorf / Moos ZH CH Urdorf / Moos 1266
+Discard: Urdorf / Zentrum ZH CH Urdorf / Zentrum 913
+Discard: Urdorf / Heidenkeller ZH CH Urdorf / Heidenkeller 743
+Discard: Urdorf / Ob der Bahn ZH CH Urdorf / Ob der Bahn 513
+Discard: Urdorf / Oberurdorf ZH CH Urdorf / Oberurdorf 1008
+Discard: Urdorf / Fadmatt ZH CH Urdorf / Fadmatt 895
+Discard: Urdorf / Baumgarten ZH CH Urdorf / Baumgarten 902
+Discard: Zürich (Kreis 12) / Auzelg ZH CH Zuerich (Kreis 12) / Auzelg 1143
+Discard: Zürich (Kreis 11) / Schwandenholz ZH CH Zuerich (Kreis 11) / Schwandenholz 1145
+Discard: Zürich (Kreis 2) / Mittel-Leimbach ZH CH Zuerich (Kreis 2) / Mittel-Leimbach 1891
+Remove extras: Zürich (Kreis 2) / Unter-Leimbach -> / ::: ZH CH Zuerich (Kreis 2) / Unter-Leimbach 2778
+Discard: Zürich (Kreis 7) / Looren ZH CH Zuerich (Kreis 7) / Looren 509
+Remove extras: Zürich (Kreis 10) / Wipkingen -> / ::: ZH CH Zuerich (Kreis 10) / Wipkingen 15718
+Remove extras: Zürich (Kreis 10) / Rütihof -> / ::: ZH CH Zuerich (Kreis 10) / Ruetihof 3326
+Remove extras: Zürich (Kreis 1) / Rathaus -> / ::: ZH CH Zuerich (Kreis 1) / Rathaus 3091
+Remove extras: Zürich (Kreis 11) / Affoltern -> / ::: ZH CH Zuerich (Kreis 11) / Affoltern 17241
+Discard: Zürich (Kreis 1) / Hochschulen ZH CH Zuerich (Kreis 1) / Hochschulen 707
+Remove extras: Zürich (Kreis 12) / Saatlen -> / ::: ZH CH Zuerich (Kreis 12) / Saatlen 5209
+Remove extras: Zürich (Kreis 12) / Schwamendingen-Mitte -> / ::: ZH CH Zuerich (Kreis 12) / Schwamendingen-Mitte 10476
+Remove extras: Zürich (Kreis 12) / Hirzenbach -> / ::: ZH CH Zuerich (Kreis 12) / Hirzenbach 11335
+Discard: Zürich (Kreis 1) / Lindenhof ZH CH Zuerich (Kreis 1) / Lindenhof 1298
+Discard: Zürich (Kreis 1) / City ZH CH Zuerich (Kreis 1) / City 1089
+Remove extras: Zürich (Kreis 2) / Wollishofen -> / ::: ZH CH Zuerich (Kreis 2) / Wollishofen 16073
+Remove extras: Zürich (Kreis 2) / Enge -> / ::: ZH CH Zuerich (Kreis 2) / Enge 8253
+Remove extras: Zürich (Kreis 3) / Friesenberg -> / ::: ZH CH Zuerich (Kreis 3) / Friesenberg 9909
+Remove extras: Zürich (Kreis 3) / Sihlfeld -> / ::: ZH CH Zuerich (Kreis 3) / Sihlfeld 20977
+Remove extras: Zürich (Kreis 4) / Werd -> / ::: ZH CH Zuerich (Kreis 4) / Werd 3911
+Remove extras: Zürich (Kreis 4) / Langstrasse -> / ::: ZH CH Zuerich (Kreis 4) / Langstrasse 10386
+Remove extras: Zürich (Kreis 4) / Hard -> / ::: ZH CH Zuerich (Kreis 4) / Hard 12976
+Remove extras: Zürich (Kreis 5) / Gewerbeschule -> / ::: ZH CH Zuerich (Kreis 5) / Gewerbeschule 9891
+Discard: Zürich (Kreis 5) / Escher-Wyss ZH CH Zuerich (Kreis 5) / Escher-Wyss 1846
+Remove extras: Zürich (Kreis 6) / Unterstrass -> / ::: ZH CH Zuerich (Kreis 6) / Unterstrass 20045
+Remove extras: Zürich (Kreis 6) / Oberstrass -> / ::: ZH CH Zuerich (Kreis 6) / Oberstrass 9906
+Remove extras: Zürich (Kreis 7) / Fluntern -> / ::: ZH CH Zuerich (Kreis 7) / Fluntern 7009
+Remove extras: Zürich (Kreis 7) / Hottingen -> / ::: ZH CH Zuerich (Kreis 7) / Hottingen 9934
+Remove extras: Zürich (Kreis 7) / Hirslanden -> / ::: ZH CH Zuerich (Kreis 7) / Hirslanden 6769
+Remove extras: Zürich (Kreis 8) / Seefeld -> / ::: ZH CH Zuerich (Kreis 8) / Seefeld 4998
+Remove extras: Zürich (Kreis 8) / Mühlebach -> / ::: ZH CH Zuerich (Kreis 8) / Muehlebach 5570
+Remove extras: Zürich (Kreis 8) / Weinegg -> / ::: ZH CH Zuerich (Kreis 8) / Weinegg 4951
+Remove extras: Zürich (Kreis 9) / Albisrieden -> / ::: ZH CH Zuerich (Kreis 9) / Albisrieden 16480
+Remove extras: Zürich (Kreis 9) / Altstetten -> / ::: ZH CH Zuerich (Kreis 9) / Altstetten 28307
+Discard: Oberrieden / See ZH CH Oberrieden / See 645
+Discard: Thalwil / See ZH CH Thalwil / See 1893
+城郊 -> cheng jiao ::: 19 CN cheng jiao 0
+Sidi Senoussi سيدي سنوسي -> Sidi Senoussi ::: 15 DZ Sidi Senoussi sydy snwsy 7500
+Remove extras: Gasteiz / Vitoria -> Gasteiz ::: 59 ES Gasteiz / Vitoria 235661
+Discard: Eskuernaga / Villabuena de Álava 59 ES Villabuena de Alava 311
+Discard: Urdazubi / Urdax 32 ES Urdazubi / Urdax 367
+Discard: Torrent de Cinca / Torrente de Cinca 52 ES Torrent de Cinca / Torrente de Cinca 992
+Remove extras: Tamarit de Llitera / Tamarite de Litera -> Tamarit de Llitera ::: 52 ES Tamarit de Llitera / Tamarite de Litera 3655
+Remove extras: Donostia / San Sebastián -> Donostia ::: 59 ES San Sebastian 185357
+Remove extras: Agurain / Salvatierra -> Agurain ::: 59 ES Agurain / Salvatierra 4986
+Remove extras: Oion / Oyón -> Oion ::: 59 ES Oion / Oyon 3368
+Remove extras: Urduña / Orduña -> Urduña ::: 59 ES Urduna 4072
+Discard: Moreda Araba / Moreda de Álava 59 ES Moreda de Alava 275
+Remove extras: Arrasate / Mondragón -> Arrasate ::: 59 ES Arrasate / Mondragon 22019
+Discard: Mequinensa / Mequinenza 52 ES Mequinensa / Mequinenza 2479
+Remove extras: Laudio / Llodio -> Laudio ::: 59 ES Llodio 18314
+Remove extras: Sant Pere, Santa Caterina i La Ribera -> Sant Pere ::: 56 ES Sant Pere, Santa Caterina i La Ribera 22856
+Discard: Lantziego / Lanciego 59 ES Lanciego 640
+Discard: Bastida / Labastida 59 ES Labastida 1363
+Discard: Benavarri / Benabarre 52 ES Benavarri / Benabarre 1110
+Discard: Beseit / Beceite 52 ES Beseit / Beceite 597
+Discard: Arenys de Lledó / Arens de Lledó 52 ES Arenys de Lledo / Arens de Lledo 224
+Discard: el Campell / Alcampell 52 ES el Campell / Alcampell 827
+Discard: Areny de Noguera / Arén 52 ES Areny de Noguera / Aren 0
+Discard: el Torricó / Altorricon 52 ES el Torrico / Altorricon 1462
+Remove extras: Vallvidrera, el Tibidabo i les Planes -> Vallvidrera ::: 56 ES Vallvidrera, el Tibidabo i les Planes 4666
+Discard: Church End, Eversholt ENG GB Church End, Eversholt 680
+Remove extras: Basford, Stoke-on-Trent -> Basford ::: ENG GB Basford, Stoke-on-Trent 7321
+Mosynopolis, Maximianopolis, Μαξιμιανούπολις -> Mosynopolis, Maximianopolis ::: ESYE11 GR Mosynopolis, Maximianopolis, Maximianoupolis 0
+Discard: Mosynopolis, Maximianopolis ESYE11 GR Mosynopolis, Maximianopolis, Maximianoupolis 0
+Remove extras: Santa Rita, Copan -> Santa Rita ::: 05 HN Santa Rita, Copan 2704
+Remove extras: Las Vegas, Santa Barbara -> Las Vegas ::: 16 HN Las Vegas, Santa Barbara 7487
+Remove extras: Laikit, Laikit II (Dimembe) -> Laikit ::: 31 ID Laikit, Laikit II (Dimembe) 8000
+Kalimpong, Крукети -> Kalimpong ::: 28 IN Kalimpong, Kruketi 0
+Remove extras: Troina / Draginai -> Troina ::: 15 IT Troina / Draginai 9081
+Старо Нагоричане -> Staro Nagorichane ::: 97 MK Staro Nagorichane 4112
+Слупчане -> Slupchane ::: 59 MK Slupchane 2658
+Петровец -> Petrovec ::: 79 MK Petrovec 8298
+Никиштане -> Nikishtane ::: 00 MK Nikishtane 793
+Мралино -> Mralino ::: 00 MK Mralino 703
+Мирковци -> Mirkovci ::: 00 MK Mirkovci 958
+Кучково -> Kuchkovo ::: 00 MK Kuchkovo 608
+Јурумлери -> Jurumleri ::: F6 MK Jurumleri 2061
+Извор -> Izvor ::: 37 MK Izvor 696
+Идризово -> Idrizovo ::: F6 MK Idrizovo 2292
+Горно Јаболчиште -> Gorno Jabolchishte ::: 00 MK Gorno Jabolchishte 977
+Чучер - Сандево -> Chucher - Sandevo ::: 20 MK Chucher - Sandevo 8646
+Булачани -> Bulachani ::: 00 MK Bulachani 1033
+Арачиново -> Arachinovo ::: 01 MK Arachinovo 12800
+Зуунмод -> Zuunmod ::: 18 MN Zuunmod 17630
+Discard: Barrio las Palomas, Santa Ana Nichi 15 MX Barrio las Palomas, Santa Ana Nichi 846
+Discard: Barrio la Mesa, Rioyos Buenavista 15 MX Barrio la Mesa, Rioyos Buenavista 949
+Remove extras: Kampung Bukit Tinggi, Bentong -> Kampung Bukit Tinggi ::: 06 MY Kampung Bukit Tinggi, Bentong 12346
+Discard: Brgy. Tinigao, Kalibo 06 PH Brgy. Tinigao, Kalibo 2000
+Remove extras: Poblacion, San Felipe -> Poblacion ::: 03 PH Poblacion, San Felipe 14981
+Discard: Brgy. Nalook, kalibo 06 PH Brgy. Nalook, kalibo 2000
+Remove extras: Magapit, Aguiguican -> Magapit ::: 02 PH Magapit, Aguiguican 13659
+Discard: Brgy. Mabilo, New Washington 06 PH Brgy. Mabilo, New Washington 2440
+Remove extras: Hiju, Maco -> Hiju ::: 11 PH Hiju, Maco 3014
+Remove extras: Guinayangan, Fourth District of Quezon -> Guinayangan ::: 40 PH Guinayangan, Fourth District of Quezon 2732
+Remove extras: Del Carmen, Surigao del Norte -> Del Carmen ::: 13 PH Del Carmen, Surigao del Norte 4276
+Remove extras: Brgy. New Buswang, Kalibo -> Brgy. New Buswang ::: 06 PH Brgy. New Buswang, Kalibo 3000
+Remove extras: Brgy. Bulwang, Numancia -> Brgy. Bulwang ::: 06 PH Brgy. Bulwang, Numancia 3462
+Discard: Brgy. Bubog, Numancia 06 PH Brgy. Bubog, Numancia 1000
+Discard: Brgy. Bachaw Norte, Kalibo 06 PH Brgy. Bachaw Norte, Kalibo 1500
+Жана-Аул -> Zhana-Aul ::: 03 RU Zhana-Aul 900
+Половинка -> Polovinka ::: 04 RU Polovinka 664
+Кипарисово-2 -> Kiparisovo-2 ::: 59 RU Kiparisovo-2 676
+Remove extras: Eglise Catholique, Centrale GIKO -> Eglise Catholique ::: 15 RW Eglise Catholique, Centrale GIKO 3000
+shokhaibٍ -> shokhaib ::: 10 SA shokhaib 1500
+Najaru قرية نجرو -> Najaru ::: 38 SD Najaru qryt njrw 1153
+ِAl Taif -> Al Taif ::: 29 SD Al Taif 0
+Розгирче -> Rozgirche ::: 06 UA Rozgirche 566
+Discard: Stambaugh, Iron River MI US Stambaugh, Iron River 1215
+Discard: New Century, KS KS US New Century, KS 1072
+Al-Medy Village, قرية المدي -> Al-Medy Village ::: 11 YE Al-Medy Village, qryt almdy 2000
+812
+
+Process finished with exit code 0
+
+
