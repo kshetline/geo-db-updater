@@ -1,5 +1,5 @@
 import { requestJson } from 'by-request';
-import { createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { toBoolean, toNumber } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
@@ -7,8 +7,10 @@ import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool } from './mysql-await-async';
-import { initGazetteer, ProcessedNames, processPlaceNames } from './gazetteer';
+import { initGazetteer, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
+import unidecode from 'unidecode-plus';
+import { doubleMetaphone } from 'double-metaphone';
 
 const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
 
@@ -24,6 +26,26 @@ const ALL_COUNTRIES_URL = 'https://download.geonames.org/export/dump/allCountrie
 const ALL_COUNTRIES_FILE = 'cache/all-countries.zip';
 const ALL_COUNTRIES_TEXT_FILE = 'cache/all-countries.txt';
 
+interface Location {
+  name: string;
+  key: string;
+  geonamesId?: number;
+  source?: string;
+  variants?: string[];
+  admin2?: string;
+  admin1?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  population: number;
+  timezone: string;
+  featureCode: string;
+  rank: number;
+  metaphone1?: string;
+  metaphone2?: string;
+}
+
 export const pool = new Pool({
   host: (toBoolean(process.env.DB_REMOTE) ? 'skyviewcafe.com' : '127.0.0.1'),
   user: 'skyview',
@@ -38,6 +60,10 @@ for (let x = 0; x < 24; ++x) {
 
   for (let y = 0; y < 12; ++y)
     zoneGrid[x][y] = [];
+}
+
+function makeKey(name: string): string {
+  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z]+/g, '');
 }
 
 /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -105,30 +131,52 @@ async function getGeoData(): Promise<void> {
     { maxCacheAge: THREE_MONTHS, unzipName: ALL_COUNTRIES_TEXT_FILE });
 }
 
-const places: ProcessedNames[] = [];
+const places: Location[] = [];
+const geoNamesLookup = new Map<number, Location>();
 
 async function readGeoData(file: string): Promise<void> {
   await initGazetteer();
 
   const inStream = createReadStream(file, 'utf8');
+  const outStream = createWriteStream('temp.txt', 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
 
   for await (const line of lines) {
     const parts = line.split('\t');
-    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let [geonameId, name, asciiName, altNames, , , featureClass, featureCode,
-    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
-         countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const [, name, altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
 
     if (!name)
       continue;
 
-    /* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
-    const processed = processPlaceNames(name, admin2, admin1, countryCode);
+    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
+    const p = processPlaceNames(name, admin2, admin1, countryCode);
+    const metaphone = doubleMetaphone(name);
 
-    if (processed)
-      places.push(processed);
+    if (p) {
+      const location = {
+        name: p.city,
+        key: makeKey(name),
+        geonamesId,
+        source: 'GEON',
+        variants: altNames.split(','),
+        admin2: p.county,
+        admin1: p.state,
+        country: p.country,
+        latitude,
+        longitude,
+        elevation,
+        population,
+        timezone,
+        featureCode: featureClass + '.' + featureCode,
+        rank: 0,
+        metaphone1: metaphone[0],
+        metaphone2: metaphone[1]
+      };
+
+      places.push(location);
+      geoNamesLookup.set(geonamesId, location);
+      outStream.write(JSON.stringify(location).replace(/,/g, ', ') + '\n');
+    }
   }
 
   console.log(places.length);
