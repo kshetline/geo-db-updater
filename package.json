@@ -4,7 +4,7 @@
   "description": "Update geographic database for Sky View Cafe",
   "type": "module",
   "scripts": {
-    "start": "node --experimental-specifier-resolution=node --loader ts-node/esm app.ts",
+    "start": "node --experimental-specifier-resolution=node --loader ts-node/esm src/app.ts",
     "build": "tsc && chmod +x ./dist/cli.js",
     "lint": "eslint 'src/**/*.ts'"
   },
