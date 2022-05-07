@@ -206,7 +206,7 @@ async function updatePrimaryTable(): Promise<void> {
     a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
 
   let connection: PoolConnection;
-  let index = 0, lastPercent = '0.0';
+  let index = 0, lastPercent = 0;
 
   try {
     connection = await pool.getConnection();
@@ -225,13 +225,16 @@ async function updatePrimaryTable(): Promise<void> {
 
       await connection.queryResults(query, values);
 
-      const percent = (++index * 100 / places.length).toFixed(1);
+      const percent = floor(++index * 1000 / places.length) / 10;
 
       if (percent > lastPercent) {
-        console.log(`written: ${percent}%`);
+        console.log(`written: ${percent.toFixed(1)}%`);
         lastPercent = percent;
       }
     }
+
+    connection?.release();
+    console.log('written: 100%');
   }
   catch (err) {
     console.error(err.toString());
@@ -256,6 +259,8 @@ async function updatePrimaryTable(): Promise<void> {
     await readGeoData(CITIES_15000_TEXT_FILE);
     await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
     await updatePrimaryTable();
+
+    process.exit(0);
   }
   catch (err) {
     console.error(err);
