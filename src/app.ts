@@ -1,12 +1,12 @@
 import { requestJson } from 'by-request';
-import { createReadStream, createWriteStream } from 'fs';
+import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { toBoolean, toNumber } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
-import { Pool } from './mysql-await-async';
+import { Pool, PoolConnection } from './mysql-await-async';
 import { initGazetteer, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import unidecode from 'unidecode-plus';
@@ -66,12 +66,11 @@ function makeKey(name: string): string {
   return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z]+/g, '');
 }
 
-/* @ts-ignore */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function findTimezone(lat: number, lon: number): string {
   const x = floor(mod(lon, 360) / 15);
   const y = floor((lat + 90) / 15);
 
-  for (const zone of zoneGrid[x][y]) {
+  for (const zone of (zoneGrid[x][y] ?? [])) {
     if (booleanPointInPolygon([lon, lat], zone.geometry as any))
       return zone.properties.tzid;
   }
@@ -140,31 +139,35 @@ async function readGeoData(file: string, level = 0): Promise<void> {
 
   for await (const line of lines) {
     const parts = line.split('\t');
-    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
+    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
     const [, name, , altNames, , , featureClass, featureCode0, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const featureCode = featureClass + '.' + featureCode0;
 
     if (!name || name.includes(',') || geoNamesLookup.has(geonamesId) || admin1 === '0Z' ||
         !/[PT]/i.test(featureClass) ||
         (featureClass === 'P' && !(population > 1000 || /PPLA|PPLA2|PPLA3|PPLC|PPLG/i.test(featureClass))) ||
-        (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode0)))
+        (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode0)) ||
+        (featureClass === 'T' && elevation < 600 && /^(MT|PK)$/i.test(featureCode0)))
       continue;
 
     const p = processPlaceNames(name, admin2, admin1, countryCode);
 
     if (p) {
-      let rank = (level === 0 ? 2 : 1) - (featureClass === 'T' ? 1 : 0);
+      let rank = (featureClass === 'T' ? 0 : (level === 0 ? 2 : 1));
       const metaphone = doubleMetaphone(name);
 
-      if (featureCode === 'PPLC')
-        rank += 2;
-      else if (featureCode === 'PPLA')
-        ++rank;
-      else if (population === 0)
-        --rank;
+      if (featureClass === 'P') {
+        if (featureCode === 'PPLC')
+          rank += 2;
+        else if (featureCode === 'PPLA')
+          ++rank;
+        else if (population === 0)
+          --rank;
 
-      if (population >= 1000000)
-        ++rank;
+        if (population >= 1000000)
+          ++rank;
+      }
 
       const location = {
         name: p.city,
@@ -179,9 +182,9 @@ async function readGeoData(file: string, level = 0): Promise<void> {
         longitude,
         elevation,
         population,
-        timezone,
+        timezone: timezone || findTimezone(latitude, longitude),
         featureCode,
-        rank: Math.max(rank, 0),
+        rank,
         metaphone1: metaphone[0],
         metaphone2: metaphone[1]
       };
@@ -192,17 +195,56 @@ async function readGeoData(file: string, level = 0): Promise<void> {
       places.push(location);
       geoNamesLookup.set(geonamesId, location);
 
-      if (places.length % 10000 === 0)
+      if (places.length % 50000 === 0)
         console.log('size:', places.length);
     }
   }
+}
+
+async function updatePrimaryTable(): Promise<void> {
+  places.sort((a, b) => a.country === 'USA' && b.country !== 'USA' ? -1 :
+    a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
+
+  let connection: PoolConnection;
+  let index = 0, lastPercent = 0;
+
+  try {
+    connection = await pool.getConnection();
+
+    for (const loc of places) {
+      const query = `INSERT INTO gazetteer
+        (key_name, name, admin2, admin1, country,
+         latitude, longitude, elevation, rank, feature_type,
+         mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           latitude = ?, longitude = ?, elevation = ?, rank = ?, source = ?, geonames_id = ?`;
+      const values = [loc.key, loc.name, loc.admin2, loc.admin1, loc.country,
+                      loc.latitude, loc.longitude, loc.elevation, loc.rank, loc.featureCode,
+                      loc.metaphone1, loc.metaphone2, loc.source, loc.geonamesId,
+                      loc.latitude, loc.longitude, loc.elevation, loc.rank, loc.source, loc.geonamesId];
+
+      await connection.queryResults(query, values);
+
+      const percent = Math.floor(++index * 100 / places.length);
+
+      if (percent > lastPercent) {
+        console.log(`written: ${percent}%`);
+        lastPercent = percent;
+      }
+    }
+  }
+  catch (err) {
+    console.error(err.toString());
+  }
+
+  connection?.release();
 }
 
 (async (): Promise<void> => {
   try {
     await checkUnzip();
 
-    if (Date.now() < 0) {
+    if (toBoolean(process.env.DB_GET_TIMEZONE_SHAPES)) {
       const timezones = await getTimezoneShapes();
 
       timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
@@ -213,18 +255,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
     await initGazetteer();
     await readGeoData(CITIES_15000_TEXT_FILE);
     await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
-
-    places.sort((a, b) => a.country === 'USA' && b.country !== 'USA' ? -1 :
-      a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
-
-    const outStream = createWriteStream('temp.txt', 'utf8');
-
-    for (const loc of places) {
-      delete loc.variants;
-      outStream.write(JSON.stringify(loc).replace(/,/g, ', ').replace(/":/g, '": ') + '\n');
-    }
-
-    outStream.close();
+    await updatePrimaryTable();
   }
   catch (err) {
     console.error(err);
