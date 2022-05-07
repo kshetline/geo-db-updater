@@ -1,10 +1,11 @@
 import { readdirSync } from 'fs';
 import { acos, cos_deg, PI, sin_deg } from '@tubular/math';
 import { join as pathJoin } from 'path';
-import { makePlainASCII_UC, stripLatinDiacriticals } from '@tubular/util';
+import { makePlainASCII_UC, stripLatinDiacriticals, toNumber } from '@tubular/util';
 import { requestText } from 'by-request';
 import { readFile } from 'fs/promises';
 import { getPossiblyCachedFile } from './file-util';
+import unidecode from 'unidecode-plus';
 
 const COUNTRY_INFO_URL = 'https://download.geonames.org/export/dump/countryInfo.txt';
 const COUNTRY_INFO_TEXT_FILE = 'cache/countryInfo.txt';
@@ -30,6 +31,29 @@ export interface ProcessedNames {
   longCountry: string;
   continent: string;
 }
+
+export interface Country {
+  name: string;
+  key_name: string;
+  iso2: string;
+  iso3: string;
+  geonames_id?: number;
+  postal_regex?: string;
+  source: string;
+}
+
+export const countries = new Map<number, Country>();
+
+export interface AdminEntity {
+  name: string;
+  key_name: string;
+  code: string;
+  geonames_id?: number;
+  source: string;
+}
+
+export const admin1s = new Map<number, AdminEntity>();
+export const admin2s = new Map<number, AdminEntity>();
 
 const longStates: Record<string, string> = {};
 const stateAbbreviations: Record<string, string> = {};
@@ -141,6 +165,10 @@ function eqci(s1: string, s2: string): boolean {
   return s1 === s2 || s1 == null && s2 == null || s1.localeCompare(s2, undefined, { usage: 'search', sensitivity: 'base' }) === 0;
 }
 
+export function makeKey(name: string): string {
+  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z]+/g, '').substring(0, 40);
+}
+
 export async function initGazetteer(): Promise<void> {
   try {
     await initFlagCodes();
@@ -151,47 +179,66 @@ export async function initGazetteer(): Promise<void> {
     let lines = (await readFile(COUNTRY_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
 
     lines.forEach(line => {
-      const parts = line.split(/\t/);
+      if (line.startsWith('#'))
+        return;
 
-      if (parts.length > 4) {
-        const code2 = parts[0].trim();
-        const code3 = parts[1].trim();
-        const oldCode2 = parts[3].trim();
-        const name = parts[4].trim();
+      const parts = line.split(/\t/).map(p => p.trim());
 
-        nameToCode3[simplify(name).substr(0, 20)] = code3;
+      if (parts.length > 16) {
+        const [iso2, iso3, , oldCode2, name] = parts;
+        const postal_regex = parts[14];
+        const geonames_id = toNumber(parts[16]);
+        const key_name = makeKey(name);
+
+        countries.set(geonames_id, { name, key_name, iso2, iso3, geonames_id, postal_regex, source: 'GEON' });
+
+        nameToCode3[simplify(name).substr(0, 20)] = iso3;
         // if (!'ATF SJM SJM SYR'.includes(code3))
-        code3ToName[code3] = name;
+        code3ToName[iso3] = name;
 
-        if (code2) {
-          code2ToCode3[code2] = code3;
-          code3ToCode2[code3] = code2;
+        if (iso2) {
+          code2ToCode3[iso2] = iso3;
+          code3ToCode2[iso3] = iso2;
         }
 
         if (oldCode2)
-          new3ToOld2[code3] = oldCode2;
+          new3ToOld2[iso3] = oldCode2;
       }
     });
 
     lines = (await readFile(STATE_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
 
     lines.forEach(line => {
-      const parts = line.split(/\t/);
+      const parts = line.split(/\t/).map(p => p.trim());
 
-      if (parts.length > 2) {
-        states[parts[0].trim()] = parts[1].trim();
-        statesAscii[parts[0].trim()] = parts[2].trim();
+      if (parts.length > 3) {
+        const [code0, name, ascii, geo_id] = parts;
+        const key_name = code2ToCode3[code0.substr(0, 2)] + code0.substr(2);
+        const code = code0.substr(3);
+        const geonames_id = toNumber(geo_id);
+
+        admin1s.set(geonames_id, { name, key_name, code, geonames_id, source: 'GEON' });
+
+        states[code0] = name;
+        statesAscii[code0] = ascii;
       }
     });
 
     lines = (await readFile(COUNTY_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
 
     lines.forEach(line => {
-      const parts = line.split(/\t/);
+      const parts = line.split(/\t/).map(p => p.trim());
 
       if (parts.length > 2) {
-        counties[parts[0].trim()] = parts[1].trim();
-        countiesAscii[parts[0].trim()] = parts[2].trim();
+        const [code0, name, ascii, geo_id] = parts;
+        const key_name = code2ToCode3[code0.substr(0, 2)] + code0.substr(2);
+        const code = code0.replace(/^.+\./, '');
+        const geonames_id = toNumber(geo_id);
+
+        admin2s.set(geonames_id, { name, key_name, code, geonames_id, source: 'GEON' });
+
+        counties[code0] = name;
+        countiesAscii[code0] = ascii;
       }
     });
 

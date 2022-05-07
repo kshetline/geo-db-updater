@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
-import { initGazetteer, processPlaceNames } from './gazetteer';
+import { admin1s, admin2s, countries, initGazetteer, makeKey, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import unidecode from 'unidecode-plus';
 import { doubleMetaphone } from './double-metaphone';
@@ -28,8 +28,8 @@ const ALL_COUNTRIES_TEXT_FILE = 'cache/all-countries.txt';
 
 interface Location {
   name: string;
-  key: string;
-  geonamesId?: number;
+  key_name: string;
+  geonames_id?: number;
   source?: string;
   variants?: string[];
   admin2?: string;
@@ -40,10 +40,10 @@ interface Location {
   elevation: number;
   population: number;
   timezone: string;
-  featureCode: string;
+  feature_code: string;
   rank: number;
-  metaphone1?: string;
-  metaphone2?: string;
+  mphone1?: string;
+  mphone2?: string;
 }
 
 export const pool = new Pool({
@@ -60,10 +60,6 @@ for (let x = 0; x < 24; ++x) {
 
   for (let y = 0; y < 12; ++y)
     zoneGrid[x][y] = [];
-}
-
-function makeKey(name: string): string {
-  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z]+/g, '');
 }
 
 function findTimezone(lat: number, lon: number): string {
@@ -140,15 +136,15 @@ async function readGeoData(file: string, level = 0): Promise<void> {
   for await (const line of lines) {
     const parts = line.split('\t');
     const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
-    const [, name, , altNames, , , featureClass, featureCode0, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const [, name, , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
-    const featureCode = featureClass + '.' + featureCode0;
+    const feature_code = featureClass + '.' + featureCode;
 
     if (!name || name.includes(',') || geoNamesLookup.has(geonamesId) || admin1 === '0Z' ||
         !/[PT]/i.test(featureClass) ||
         (featureClass === 'P' && !(population > 1000 || /PPLA|PPLA2|PPLA3|PPLC|PPLG/i.test(featureClass))) ||
-        (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode0)) ||
-        (featureClass === 'T' && elevation < 600 && /^(MT|PK)$/i.test(featureCode0)))
+        (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode)) ||
+        (featureClass === 'T' && elevation < 600 && /^(MT|PK)$/i.test(featureCode)))
       continue;
 
     const p = processPlaceNames(name, admin2, admin1, countryCode);
@@ -158,20 +154,20 @@ async function readGeoData(file: string, level = 0): Promise<void> {
       const metaphone = doubleMetaphone(unidecode(name));
 
       if (featureClass === 'P') {
-        if (featureCode === 'P.PPLC')
+        if (feature_code === 'P.PPLC')
           rank += 2;
-        else if (featureCode === 'P.PPLA')
+        else if (feature_code === 'P.PPLA')
           ++rank;
         else if (population === 0)
           --rank;
 
-        if (population >= 1000000 || (featureCode === 'P.PPLC' && population > 500000))
+        if (population >= 1000000 || (feature_code === 'P.PPLC' && population > 500000))
           ++rank;
       }
 
       const location = {
         name: p.city,
-        key: makeKey(name),
+        key_name: makeKey(name),
         geonamesId,
         source: 'GEON',
         variants: altNames.split(','),
@@ -183,14 +179,14 @@ async function readGeoData(file: string, level = 0): Promise<void> {
         elevation,
         population,
         timezone: timezone || findTimezone(latitude, longitude),
-        featureCode,
+        feature_code,
         rank,
-        metaphone1: metaphone[0],
-        metaphone2: metaphone[1]
+        mphone1: metaphone[0],
+        mphone2: metaphone[1]
       };
 
       if (metaphone[1] === metaphone[0])
-        delete location.metaphone2;
+        delete location.mphone2;
 
       places.push(location);
       geoNamesLookup.set(geonamesId, location);
@@ -201,9 +197,9 @@ async function readGeoData(file: string, level = 0): Promise<void> {
   }
 }
 
-async function updatePrimaryTable(): Promise<void> {
+async function updatePrimaryTables(): Promise<void> {
   places.sort((a, b) => a.country === 'USA' && b.country !== 'USA' ? -1 :
-    a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
+    a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonames_id - b.geonames_id);
 
   let connection: PoolConnection;
   let index = 0, lastPercent = 0;
@@ -211,31 +207,83 @@ async function updatePrimaryTable(): Promise<void> {
   try {
     connection = await pool.getConnection();
 
+    for (const loc of countries.values()) {
+      const query = `INSERT INTO gazetteer_countries
+        (name, key_name, iso2, iso3, geonames_id, postal_regex, source) values (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = ?, key_name = ?, iso2 = ?, geonames_id = ?, postal_regex = ?, source = ?, time_stamp = now()`;
+      const values = [loc.name, loc.key_name, loc.iso2, loc.iso3, loc.geonames_id, loc.postal_regex, loc.source,
+                      loc.name, loc.key_name, loc.iso2, loc.geonames_id, loc.postal_regex, loc.source];
+
+      await connection.queryResults(query, values);
+
+      const percent = floor(++index * 100 / countries.size);
+
+      if (percent > lastPercent) {
+        console.log(`countries written: ${percent}%`);
+        lastPercent = percent;
+      }
+    }
+
+    if (lastPercent !== 100)
+      console.log('countries written: 100%');
+
+    lastPercent = 0;
+    index = 0;
+
+    for (let i = 1; i <= 2; ++i) {
+      const admins = (i === 1 ? admin1s : admin2s);
+
+      for (const loc of admins.values()) {
+        const query = `INSERT INTO gazetteer_admin${i}
+          (name, key_name, code, geonames_id, source) values (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name = ?, code = ?, geonames_id = ?, source = ?, time_stamp = now()`;
+        const values = [loc.name, loc.key_name, loc.code, loc.geonames_id, loc.source,
+                        loc.name, loc.code, loc.geonames_id, loc.source];
+
+        await connection.queryResults(query, values);
+
+        const percent = floor(++index * 100 / admins.size);
+
+        if (percent > lastPercent) {
+          console.log(`admin${i}s written: ${percent}%`);
+          lastPercent = percent;
+        }
+      }
+
+      if (lastPercent !== 100)
+        console.log(`admin${i}s written: 100%`);
+
+      lastPercent = 0;
+      index = 0;
+    }
+
     for (const loc of places) {
       const query = `INSERT INTO gazetteer
         (key_name, name, admin2, admin1, country,
-         latitude, longitude, elevation, population, rank, feature_type,
+         latitude, longitude, elevation, population, rank, feature_code,
          mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            latitude = ?, longitude = ?, elevation = ?, population = ?, rank = ?, source = ?, geonames_id = ?,
            time_stamp = now()`;
-      const values = [loc.key, loc.name, loc.admin2, loc.admin1, loc.country,
-                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.featureCode,
-                      loc.metaphone1, loc.metaphone2, loc.source, loc.geonamesId,
-                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.source, loc.geonamesId];
+      const values = [loc.key_name, loc.name, loc.admin2, loc.admin1, loc.country,
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.feature_code,
+                      loc.mphone1, loc.mphone2, loc.source, loc.geonames_id,
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.source, loc.geonames_id];
 
       await connection.queryResults(query, values);
 
       const percent = floor(++index * 1000 / places.length) / 10;
 
       if (percent > lastPercent) {
-        console.log(`written: ${percent.toFixed(1)}%`);
+        console.log(`places written: ${percent.toFixed(1)}%`);
         lastPercent = percent;
       }
     }
 
     if (lastPercent !== 100)
-      console.log('written: 100.0%');
+      console.log('places written: 100.0%');
   }
   catch (err) {
     console.error(err.toString());
@@ -259,7 +307,7 @@ async function updatePrimaryTable(): Promise<void> {
     await initGazetteer();
     await readGeoData(CITIES_15000_TEXT_FILE);
     await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
-    await updatePrimaryTable();
+    await updatePrimaryTables();
 
     process.exit(0);
   }
