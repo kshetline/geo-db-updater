@@ -214,14 +214,15 @@ async function updatePrimaryTable(): Promise<void> {
     for (const loc of places) {
       const query = `INSERT INTO gazetteer
         (key_name, name, admin2, admin1, country,
-         latitude, longitude, elevation, rank, feature_type,
-         mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         latitude, longitude, elevation, population, rank, feature_type,
+         mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
-           latitude = ?, longitude = ?, elevation = ?, rank = ?, source = ?, geonames_id = ?`;
+           latitude = ?, longitude = ?, elevation = ?, population = ?, rank = ?, source = ?, geonames_id = ?,
+           time_stamp = now()`;
       const values = [loc.key, loc.name, loc.admin2, loc.admin1, loc.country,
-                      loc.latitude, loc.longitude, loc.elevation, loc.rank, loc.featureCode,
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.featureCode,
                       loc.metaphone1, loc.metaphone2, loc.source, loc.geonamesId,
-                      loc.latitude, loc.longitude, loc.elevation, loc.rank, loc.source, loc.geonamesId];
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.source, loc.geonamesId];
 
       await connection.queryResults(query, values);
 
