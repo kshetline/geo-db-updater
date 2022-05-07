@@ -165,7 +165,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
         else if (population === 0)
           --rank;
 
-        if (population >= 1000000)
+        if (population >= 1000000 || (featureCode === 'P.PPLC' && population > 500000))
           ++rank;
       }
 
