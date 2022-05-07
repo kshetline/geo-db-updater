@@ -158,9 +158,9 @@ async function readGeoData(file: string, level = 0): Promise<void> {
       const metaphone = doubleMetaphone(unidecode(name));
 
       if (featureClass === 'P') {
-        if (featureCode === 'PPLC')
+        if (featureCode === 'P.PPLC')
           rank += 2;
-        else if (featureCode === 'PPLA')
+        else if (featureCode === 'P.PPLA')
           ++rank;
         else if (population === 0)
           --rank;
@@ -233,8 +233,8 @@ async function updatePrimaryTable(): Promise<void> {
       }
     }
 
-    connection?.release();
-    console.log('written: 100%');
+    if (lastPercent !== 100)
+      console.log('written: 100.0%');
   }
   catch (err) {
     console.error(err.toString());
