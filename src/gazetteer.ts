@@ -365,8 +365,8 @@ export function standardizeShortCountyName(county: string): string {
   county = county.replace(/ \(.*\)/g, '');
   county = county.replace(/\s+/g, ' ');
   county = county.replace(/\s*?-\s*?\b/g, '-');
-  county = county.replace(/City and County of /i, '');
-  county = county.replace(/ (Borough|Census Area|County|Division|Municipality|Parish)/ig, '');
+  county = county.replace(/City and (Borough|County) of /i, '');
+  county = county.replace(/ (Borough|Census Area|County|Division|Municipality|Parish|City and Borough)/ig, '');
   county = county.replace(/Aleutian Islands/i, 'Aleutians West');
   county = county.replace(/Juneau City and/i, 'Juneau');
   county = county.replace(/Coös/i, 'Coos');
@@ -491,7 +491,13 @@ export function processPlaceNames(city: string, county: string, state: string, c
     longCountry = code3ToName[country];
   }
   else {
-    console.warn(`Failed to recognize country "${country}" for city "${city}, ${state}".`);
+    if (!country && !state)
+      console.warn(`No country or state for city "${city}".`);
+    else if (!country)
+      console.warn(`No country for city "${city}, ${state}".`);
+    else
+      console.warn(`Failed to recognize country "${country}" for city "${city}, ${state}".`);
+
     country = country.replace(/^(.{0,2}).*$/, '$1?');
   }
 
@@ -542,7 +548,7 @@ export function processPlaceNames(city: string, county: string, state: string, c
             county = 'City of ' + county;
         }
         else
-          console.warn(`Failed to recognize US county "${county}" for city "${city}".`);
+          console.warn(`Failed to recognize US county "${county}" for city "${city}, ${state}".`);
       }
     }
   }

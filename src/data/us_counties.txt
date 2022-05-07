@@ -519,6 +519,7 @@ Chowan, NC
 Christian, IL
 Christian, KY
 Christian, MO
+Chugach, AK
 Churchill, NV
 Ciales, PR
 Cibola, NM
@@ -650,6 +651,7 @@ Coos, NH
 Coos, OR
 Coosa, AL
 Copiah, MS
+Copper River, AK
 Corozal, PR
 Corson, SD
 Cortland, NY
@@ -1302,6 +1304,7 @@ Honolulu, HI
 Hood River, OR
 Hood, TX
 Hooker, NE
+Hoonah-Angoon, AK
 Hopkins, KY
 Hopkins, TX
 Hormigueros, PR
@@ -1555,6 +1558,7 @@ Koochiching, MN
 Kootenai, ID
 Kosciusko, IN
 Kossuth, IA
+Kusilvak, AK
 La Crosse, WI
 La Moure, ND
 La Paz, AZ
@@ -1574,6 +1578,7 @@ Lafayette, MO
 Lafayette, MS
 Lafayette, WI
 Lafourche, LA
+LaGrange, IN
 Lagrange, IN
 Lajas, PR
 Lake and Peninsula, AK
@@ -2137,6 +2142,7 @@ Ochiltree, TX
 Oconee, GA
 Oconee, SC
 Oconto, WI
+Oglala Lakota, SD
 Ogemaw, MI
 Ogle, IL
 Oglethorpe, GA
@@ -2365,6 +2371,7 @@ Price, WI
 Prince Edward, VA
 Prince George, VA
 Prince George's, MD
+Prince of Wales-Hyder, AK
 Prince of Wales-Outer Ketchikan, AK
 Prince William, VA
 Providence, RI
@@ -3151,7 +3158,7 @@ Wythe, VA
 Yabucoa, PR
 Yadkin, NC
 Yakima, WA
-Yakutat City and, AK
+Yakutat, AK
 Yalobusha, MS
 Yamhill, OR
 Yancey, NC

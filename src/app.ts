@@ -10,7 +10,7 @@ import { Pool } from './mysql-await-async';
 import { initGazetteer, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import unidecode from 'unidecode-plus';
-import { doubleMetaphone } from 'double-metaphone';
+import { doubleMetaphone } from './double-metaphone';
 
 const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
 
@@ -134,25 +134,38 @@ async function getGeoData(): Promise<void> {
 const places: Location[] = [];
 const geoNamesLookup = new Map<number, Location>();
 
-async function readGeoData(file: string): Promise<void> {
-  await initGazetteer();
-
+async function readGeoData(file: string, level = 0): Promise<void> {
   const inStream = createReadStream(file, 'utf8');
-  const outStream = createWriteStream('temp.txt', 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
 
   for await (const line of lines) {
     const parts = line.split('\t');
-    const [, name, altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
+    const [, name, , altNames, , , featureClass, featureCode0, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const featureCode = featureClass + '.' + featureCode0;
 
-    if (!name)
+    if (!name || name.includes(',') || geoNamesLookup.has(geonamesId) || admin1 === '0Z' ||
+        !/[PT]/i.test(featureClass) ||
+        (featureClass === 'P' && !(population > 1000 || /PPLA|PPLA2|PPLA3|PPLC|PPLG/i.test(featureClass))) ||
+        (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode0)))
       continue;
 
-    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation] = parts.map(p => toNumber(p, null));
     const p = processPlaceNames(name, admin2, admin1, countryCode);
-    const metaphone = doubleMetaphone(name);
 
     if (p) {
+      let rank = (level === 0 ? 2 : 1) - (featureClass === 'T' ? 1 : 0);
+      const metaphone = doubleMetaphone(name);
+
+      if (featureCode === 'PPLC')
+        rank += 2;
+      else if (featureCode === 'PPLA')
+        ++rank;
+      else if (population === 0)
+        --rank;
+
+      if (population >= 1000000)
+        ++rank;
+
       const location = {
         name: p.city,
         key: makeKey(name),
@@ -167,19 +180,22 @@ async function readGeoData(file: string): Promise<void> {
         elevation,
         population,
         timezone,
-        featureCode: featureClass + '.' + featureCode,
-        rank: 0,
+        featureCode,
+        rank: Math.max(rank, 0),
         metaphone1: metaphone[0],
         metaphone2: metaphone[1]
       };
 
+      if (metaphone[1] === metaphone[0])
+        delete location.metaphone2;
+
       places.push(location);
       geoNamesLookup.set(geonamesId, location);
-      outStream.write(JSON.stringify(location).replace(/,/g, ', ') + '\n');
+
+      if (places.length % 10000 === 0)
+        console.log('size:', places.length);
     }
   }
-
-  console.log(places.length);
 }
 
 (async (): Promise<void> => {
@@ -194,7 +210,21 @@ async function readGeoData(file: string): Promise<void> {
     }
 
     await getGeoData();
+    await initGazetteer();
     await readGeoData(CITIES_15000_TEXT_FILE);
+    await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
+
+    places.sort((a, b) => a.country === 'USA' && b.country !== 'USA' ? -1 :
+      a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
+
+    const outStream = createWriteStream('temp.txt', 'utf8');
+
+    for (const loc of places) {
+      delete loc.variants;
+      outStream.write(JSON.stringify(loc).replace(/,/g, ', ').replace(/":/g, '": ') + '\n');
+    }
+
+    outStream.close();
   }
   catch (err) {
     console.error(err);
