@@ -155,7 +155,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
 
     if (p) {
       let rank = (featureClass === 'T' ? 0 : (level === 0 ? 2 : 1));
-      const metaphone = doubleMetaphone(name);
+      const metaphone = doubleMetaphone(unidecode(name));
 
       if (featureClass === 'P') {
         if (featureCode === 'PPLC')
@@ -175,8 +175,8 @@ async function readGeoData(file: string, level = 0): Promise<void> {
         geonamesId,
         source: 'GEON',
         variants: altNames.split(','),
-        admin2: p.county,
-        admin1: p.state,
+        admin2,
+        admin1,
         country: p.country,
         latitude,
         longitude,
@@ -206,7 +206,7 @@ async function updatePrimaryTable(): Promise<void> {
     a.country !== 'USA' && b.country === 'USA' ? 1 : a.geonamesId - b.geonamesId);
 
   let connection: PoolConnection;
-  let index = 0, lastPercent = 0;
+  let index = 0, lastPercent = '0.0';
 
   try {
     connection = await pool.getConnection();
@@ -225,7 +225,7 @@ async function updatePrimaryTable(): Promise<void> {
 
       await connection.queryResults(query, values);
 
-      const percent = Math.floor(++index * 100 / places.length);
+      const percent = (++index * 100 / places.length).toFixed(1);
 
       if (percent > lastPercent) {
         console.log(`written: ${percent}%`);
