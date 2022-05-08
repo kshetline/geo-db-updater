@@ -311,9 +311,10 @@ async function processAltNames(): Promise<void> {
       const parts = line.split('\t').map(p => p.trim());
       const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
       const [, , lang, name] = parts;
+
       let type = '';
       let gazetteer_id = 0;
-      const tables = ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'];
+      const tables = lang.length < 4 ? ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
         const query = 'SELECT id FROM gazetteer WHERE geonames_id = ?';
