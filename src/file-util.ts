@@ -34,7 +34,7 @@ async function safeStat(path: string, opts?: StatOptions & { bigint?: false, del
 }
 
 interface FileOpts extends ExtendedRequestOptions {
-  unzipName?: string;
+  unzipPath?: string;
 }
 
 export async function getPossiblyCachedFile(file: string, url: string, name: string, extraOpts?: FileOpts): Promise<void> {
@@ -64,11 +64,11 @@ export async function getPossiblyCachedFile(file: string, url: string, name: str
     }
   };
   const stats = await safeStat(file, { deleteIfEmpty: true });
-  let unzipName: string;
+  let unzipPath: string;
 
   if (extraOpts) {
-    unzipName = extraOpts.unzipName;
-    delete extraOpts.unzipName;
+    unzipPath = extraOpts.unzipPath;
+    delete extraOpts.unzipPath;
     Object.assign(opts, extraOpts);
   }
 
@@ -102,17 +102,18 @@ export async function getPossiblyCachedFile(file: string, url: string, name: str
         console.log(`Using cached ${name}`);
     }
 
-    if (unzipName) {
+    if (unzipPath) {
       const statZip = await safeStat(file);
-      const statUnzip = await safeStat(unzipName, { deleteIfEmpty: true });
+      const statUnzip = await safeStat(unzipPath, { deleteIfEmpty: true });
 
       if (!statUnzip || statUnzip.mtimeMs < statZip.mtimeMs - 1) {
         console.log(`Unzipping ${name}`);
 
         if (statUnzip)
-          await unlink(unzipName);
+          await unlink(unzipPath);
 
         let zipProc = spawn('unzip', ['-Z1', file]);
+        const unzipArgs = ['-D', '-d', 'cache', file];
         let originalZipName = '';
 
         await new Promise<void>(resolve => {
@@ -121,18 +122,35 @@ export async function getPossiblyCachedFile(file: string, url: string, name: str
           zipProc.stdout.once('end', () => resolve());
         });
 
-        originalZipName = filePath.join('cache', originalZipName.trim());
+        originalZipName = originalZipName.trim();
+
+        if (originalZipName.includes('\n')) {
+          const names = originalZipName.split('\n');
+          const unzipName = unzipPath.replace(/^.*\//, '');
+
+          if (names.includes(unzipName)) {
+            originalZipName = unzipName;
+            unzipArgs.push(unzipName);
+          }
+          else {
+            console.error(`Zip archive does not contain ${unzipName}.`);
+            // noinspection ExceptionCaughtLocallyJS
+            throw new Error();
+          }
+        }
+
+        originalZipName = filePath.join('cache', originalZipName);
         await unlink(originalZipName).catch(noop);
 
-        zipProc = spawn('unzip', ['-D', '-d', 'cache', file]);
+        zipProc = spawn('unzip', unzipArgs);
 
         await new Promise<void>(resolve => {
           zipProc.once('error', () => resolve());
           zipProc.stdout.once('end', () => resolve());
         });
 
-        await rename(originalZipName, unzipName);
-        await utimes(unzipName, statZip.mtime, statZip.mtime);
+        await rename(originalZipName, unzipPath);
+        await utimes(unzipPath, statZip.mtime, statZip.mtime);
       }
       else
         console.log(`Using cached unzipped ${name}`);

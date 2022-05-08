@@ -26,6 +26,10 @@ const ALL_COUNTRIES_URL = 'https://download.geonames.org/export/dump/allCountrie
 const ALL_COUNTRIES_FILE = 'cache/all-countries.zip';
 const ALL_COUNTRIES_TEXT_FILE = 'cache/all-countries.txt';
 
+const ALT_NAMES_URL = 'https://download.geonames.org/export/dump/alternateNames.zip';
+const ALT_NAMES_FILE = 'cache/alternateNames.zip';
+const ALT_NAMES_TEXT_FILE = 'cache/alternateNames.txt';
+
 interface Location {
   name: string;
   key_name: string;
@@ -92,7 +96,7 @@ async function getTimezoneShapes(): Promise<FeatureCollection> {
     throw new Error('Cannot obtain timezone shapes release info');
 
   await getPossiblyCachedFile(TIMEZONE_SHAPES_FILE, asset.browser_download_url, 'Timezone shapes',
-    { maxCacheAge: THREE_MONTHS, unzipName: TIMEZONE_SHAPES_JSON_FILE });
+    { maxCacheAge: THREE_MONTHS, unzipPath: TIMEZONE_SHAPES_JSON_FILE });
 
   const shapesJson = await readFile(TIMEZONE_SHAPES_JSON_FILE, 'utf8');
 
@@ -121,9 +125,11 @@ function presortTimezones(timezones: FeatureCollection): void {
 
 async function getGeoData(): Promise<void> {
   await getPossiblyCachedFile(CITIES_15000_FILE, CITIES_15000_URL, 'cities-15000',
-    { maxCacheAge: THREE_MONTHS, unzipName: CITIES_15000_TEXT_FILE });
+    { maxCacheAge: THREE_MONTHS, unzipPath: CITIES_15000_TEXT_FILE });
   await getPossiblyCachedFile(ALL_COUNTRIES_FILE, ALL_COUNTRIES_URL, 'all-countries',
-    { maxCacheAge: THREE_MONTHS, unzipName: ALL_COUNTRIES_TEXT_FILE });
+    { maxCacheAge: THREE_MONTHS, unzipPath: ALL_COUNTRIES_TEXT_FILE });
+  await getPossiblyCachedFile(ALT_NAMES_FILE, ALT_NAMES_URL, 'alt-names',
+    { maxCacheAge: THREE_MONTHS, unzipPath: ALT_NAMES_TEXT_FILE });
 }
 
 const places: Location[] = [];

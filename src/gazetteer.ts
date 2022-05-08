@@ -4,7 +4,7 @@ import { join as pathJoin } from 'path';
 import { makePlainASCII_UC, stripLatinDiacriticals, toNumber } from '@tubular/util';
 import { requestText } from 'by-request';
 import { readFile } from 'fs/promises';
-import { getPossiblyCachedFile } from './file-util';
+import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import unidecode from 'unidecode-plus';
 
 const COUNTRY_INFO_URL = 'https://download.geonames.org/export/dump/countryInfo.txt';
@@ -171,10 +171,12 @@ export function makeKey(name: string): string {
 
 export async function initGazetteer(): Promise<void> {
   try {
+    const opts = { maxCacheAge: THREE_MONTHS };
+
     await initFlagCodes();
-    await getPossiblyCachedFile(COUNTRY_INFO_TEXT_FILE, COUNTRY_INFO_URL, 'country-info');
-    await getPossiblyCachedFile(STATE_INFO_TEXT_FILE, STATE_INFO_URL, 'state-info');
-    await getPossiblyCachedFile(COUNTY_INFO_TEXT_FILE, COUNTY_INFO_URL, 'county-info');
+    await getPossiblyCachedFile(COUNTRY_INFO_TEXT_FILE, COUNTRY_INFO_URL, 'country-info', opts);
+    await getPossiblyCachedFile(STATE_INFO_TEXT_FILE, STATE_INFO_URL, 'state-info', opts);
+    await getPossiblyCachedFile(COUNTY_INFO_TEXT_FILE, COUNTY_INFO_URL, 'county-info', opts);
 
     let lines = (await readFile(COUNTRY_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
 
