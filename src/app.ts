@@ -298,6 +298,55 @@ async function updatePrimaryTables(): Promise<void> {
   connection?.release();
 }
 
+async function processAltNames(): Promise<void> {
+  let connection: PoolConnection;
+
+  try {
+    connection = await pool.getConnection();
+    const inStream = createReadStream(ALT_NAMES_TEXT_FILE, 'utf8');
+    const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+
+    for await (const line of lines) {
+      const parts = line.split('\t').map(p => p.trim());
+      const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
+      const [, , lang, name] = parts;
+      let type = '';
+      let gazetteer_id = 0;
+      const tables = ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'];
+
+      for (let i = 0; i < tables.length; ++i) {
+        const query = 'SELECT id FROM gazetteer WHERE geonames_id = ?';
+        const result = await connection.queryResults(query, [geonames_orig_id]);
+
+        if (result?.length > 0) {
+          type = 'P21C'.charAt(i);
+          gazetteer_id = result[0].id;
+          break;
+        }
+      }
+
+      if (type && gazetteer_id) {
+        const key_name = makeKey(name);
+        const query = `INSERT INTO gazetteer_alt_names
+          (name, lang, key_name, geonames_alt_id, geonames_orig_id, gazetteer_id, type, source,
+           preferred, short, colloquial, historic, misspelling) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name = ?, geonames_alt_id = ?, geonames_orig_id = ?, source = ?, time_stamp = now()`;
+        const values = [name, lang, key_name, geonames_alt_id, geonames_orig_id, gazetteer_id, type, 'GEON',
+                        preferred, short, colloquial, historic, 0,
+                        name, geonames_alt_id, geonames_orig_id, 'GEON'];
+
+        await connection.queryResults(query, values);
+      }
+    }
+  }
+  catch (err) {
+    console.error(err.toString());
+  }
+
+  connection?.release();
+}
+
 (async (): Promise<void> => {
   try {
     await checkUnzip();
@@ -311,9 +360,14 @@ async function updatePrimaryTables(): Promise<void> {
 
     await getGeoData();
     await initGazetteer();
-    await readGeoData(CITIES_15000_TEXT_FILE);
-    await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
-    await updatePrimaryTables();
+
+    if (Date.now() < 0) {
+      await readGeoData(CITIES_15000_TEXT_FILE);
+      await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
+      await updatePrimaryTables();
+    }
+
+    await processAltNames();
 
     process.exit(0);
   }
