@@ -314,20 +314,22 @@ async function processAltNames(): Promise<void> {
 
       let type = '';
       let gazetteer_id = 0;
+      let origName = '';
       const tables = lang.length < 4 ? ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
-        const query = 'SELECT id FROM gazetteer WHERE geonames_id = ?';
+        const query = 'SELECT id, name FROM gazetteer WHERE geonames_id = ?';
         const result = await connection.queryResults(query, [geonames_orig_id]);
 
         if (result?.length > 0) {
           type = 'P21C'.charAt(i);
           gazetteer_id = result[0].id;
+          origName = result[0].name;
           break;
         }
       }
 
-      if (type && gazetteer_id) {
+      if (type && gazetteer_id && origName !== name) {
         const key_name = makeKey(name);
         const query = `INSERT INTO gazetteer_alt_names
           (name, lang, key_name, geonames_alt_id, geonames_orig_id, gazetteer_id, type, source,
