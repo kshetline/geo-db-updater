@@ -305,6 +305,7 @@ async function processAltNames(): Promise<void> {
     connection = await pool.getConnection();
     const inStream = createReadStream(ALT_NAMES_TEXT_FILE, 'utf8');
     const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+    let index = 0;
 
     for await (const line of lines) {
       const parts = line.split('\t').map(p => p.trim());
@@ -338,6 +339,9 @@ async function processAltNames(): Promise<void> {
 
         await connection.queryResults(query, values);
       }
+
+      if (++index % 10000 === 0)
+        console.log(`${index} alternate names processed`);
     }
   }
   catch (err) {
