@@ -324,7 +324,7 @@ async function processAltNames(): Promise<void> {
       const tables = lang.length < 4 ? ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
-        const query = 'SELECT id, name FROM gazetteer WHERE geonames_id = ?';
+        const query = `SELECT id, name FROM ${tables[i]} WHERE geonames_id = ?`;
         const result = await connection.queryResults(query, [geonames_orig_id]);
 
         if (result?.length > 0) {
@@ -363,7 +363,8 @@ async function processAltNames(): Promise<void> {
 async function findTimezoneInDb(connection: PoolConnection, lat: number, lon: number): Promise<string> {
   zoneLoop:
   for (const span of [0.05, 0.1, 0.25, 0.5]) {
-    const query = 'SELECT timezone FROM gazetteer WHERE latitude >= ? AND latitude <= ? AND longitude >= ? AND longitude <= ?';
+    const query = `SELECT timezone FROM gazetteer
+                     WHERE latitude >= ? AND latitude <= ? AND longitude >= ? AND longitude <= ?`;
     const results = (await connection.queryResults(query, [lat - span, lat + span, lon - span, lon + span])) || [];
     let timeZoneId: string;
     let country: string;
@@ -401,42 +402,54 @@ async function processPostalCodes(): Promise<void> {
     for await (const line of lines) {
       const parts = line.split('\t').map(p => p.trim());
       const [country, code, name, , admin1] = parts;
-      const [latitude, longitude, accuracy] = parts.slice(9).map(p => toNumber(p));
+      let [latitude, longitude, accuracy] = parts.slice(9).map(p => toNumber(p));
       const iso3 = code2ToCode3[country];
       let geonames_id = 0;
       let gazetteer_id = 0;
       let timezone = '';
 
-      let query = `SELECT id, geonames_id, timezone FROM gazetteer WHERE name = ? AND country = ? AND admin1 = ?
-            AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
+      let query = `SELECT id, geonames_id, timezone, latitude, longitude
+                     FROM gazetteer WHERE name = ? AND country = ? AND admin1 = ?
+                     AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
       let values: any[] = [name, iso3, admin1, latitude, longitude];
-      const result = await connection.queryResults(query, values);
+      let result = await connection.queryResults(query, values);
+
+      if (!result || result.length === 0) {
+        query = `SELECT id, geonames_id, timezone, latitude, longitude FROM gazetteer
+                   WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name = ?)
+                     country = ? AND admin1 = ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
+        result = await connection.queryResults(query, values);
+      }
 
       if (result?.length > 0) {
         geonames_id = result[0].geonames_id;
         gazetteer_id = result[0].id;
         timezone = result[0].timezone;
+
+        if (accuracy < 4) {
+          latitude = result[0].latitude;
+          longitude = result[0].longitude;
+        }
       }
-      else
+
+      if (!timezone)
         timezone = await findTimezoneInDb(connection, latitude, longitude);
 
       if (timezone) {
         query = `INSERT INTO gazetteer_postal
-          (country, code, name, admin1, latitude, longitude, accuracy,
-           timezone, geonames_id, gazetteer_id, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             name = ?, latitude = ?, longitude = ?, accuracy = ?,
-             timezone = ?, geonames_id = ?, gazetteer_id = ?, source = ?, time_stamp = now()`;
+                   (country, code, name, admin1, latitude, longitude, accuracy,
+                    timezone, geonames_id, gazetteer_id, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                      name = ?, latitude = ?, longitude = ?, accuracy = ?,
+                      timezone = ?, geonames_id = ?, gazetteer_id = ?, source = ?, time_stamp = now()`;
         values = [country, code, name, admin1, latitude, longitude, accuracy,
                   timezone, geonames_id, gazetteer_id, 'GEON',
-                  name, latitude, longitude, accuracy,
-                  timezone, geonames_id, gazetteer_id, 'GEON'];
+                  name, latitude, longitude, accuracy, timezone, geonames_id, gazetteer_id, 'GEON'];
+        await connection.queryResults(query, values);
       }
 
-      await connection.queryResults(query, values);
-
       if (++index % 10000 === 0)
-        console.log(`${index} alternate names processed`);
+        console.log(`${index} postal codes processed`);
     }
   }
   catch (err) {
@@ -459,15 +472,12 @@ async function processPostalCodes(): Promise<void> {
 
     await getGeoData();
     await initGazetteer();
-
-    if (Date.now() < 0) {
-      await readGeoData(CITIES_15000_TEXT_FILE);
-      await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
-      await updatePrimaryTables();
-      await processAltNames();
-    }
-
+    await readGeoData(CITIES_15000_TEXT_FILE);
+    await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
+    await updatePrimaryTables();
+    await processAltNames();
     await processPostalCodes();
+
     process.exit(0);
   }
   catch (err) {
