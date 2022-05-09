@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
-import { admin1s, admin2s, countries, initGazetteer, makeKey, processPlaceNames } from './gazetteer';
+import { admin1s, admin2s, code2ToCode3, countries, initGazetteer, makeKey, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import unidecode from 'unidecode-plus';
 import { doubleMetaphone } from './double-metaphone';
@@ -29,6 +29,10 @@ const ALL_COUNTRIES_TEXT_FILE = 'cache/all-countries.txt';
 const ALT_NAMES_URL = 'https://download.geonames.org/export/dump/alternateNames.zip';
 const ALT_NAMES_FILE = 'cache/alternateNames.zip';
 const ALT_NAMES_TEXT_FILE = 'cache/alternateNames.txt';
+
+const POSTAL_URL = 'https://download.geonames.org/export/zip/allCountries.zip';
+const POSTAL_FILE = 'cache/allCountriesPostal.zip';
+const POSTAL_TEXT_FILE = 'cache/allCountriesPostal.txt';
 
 interface Location {
   name: string;
@@ -130,6 +134,8 @@ async function getGeoData(): Promise<void> {
     { maxCacheAge: THREE_MONTHS, unzipPath: ALL_COUNTRIES_TEXT_FILE });
   await getPossiblyCachedFile(ALT_NAMES_FILE, ALT_NAMES_URL, 'alt-names',
     { maxCacheAge: THREE_MONTHS, unzipPath: ALT_NAMES_TEXT_FILE });
+  await getPossiblyCachedFile(POSTAL_FILE, POSTAL_URL, 'all-countries-postal',
+    { maxCacheAge: THREE_MONTHS, unzipPath: POSTAL_TEXT_FILE });
 }
 
 const places: Location[] = [];
@@ -157,7 +163,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
 
     if (p) {
       let rank = (featureClass === 'T' ? 0 : (level === 0 ? 2 : 1));
-      const metaphone = doubleMetaphone(unidecode(name));
+      const metaphone = doubleMetaphone(unidecode(name, { skipRanges: [[0xA0, 0xFF]] }));
 
       if (featureClass === 'P') {
         if (feature_code === 'P.PPLC')
@@ -354,6 +360,92 @@ async function processAltNames(): Promise<void> {
   connection?.release();
 }
 
+async function findTimezoneInDb(connection: PoolConnection, lat: number, lon: number): Promise<string> {
+  zoneLoop:
+  for (const span of [0.05, 0.1, 0.25, 0.5]) {
+    const query = 'SELECT timezone FROM gazetteer WHERE latitude >= ? AND latitude <= ? AND longitude >= ? AND longitude <= ?';
+    const results = (await connection.queryResults(query, [lat - span, lat + span, lon - span, lon + span])) || [];
+    let timeZoneId: string;
+    let country: string;
+
+    for (const result of results) {
+      if (result.time_zone) {
+        if (!timeZoneId)
+          timeZoneId = result.time_zone;
+        else if (timeZoneId !== result.time_zone)
+          break zoneLoop;
+
+        if (!country)
+          country = result.country;
+        else if (country !== result.country)
+          break zoneLoop;
+      }
+    }
+
+    if (timeZoneId)
+      return timeZoneId;
+  }
+
+  return null;
+}
+
+async function processPostalCodes(): Promise<void> {
+  let connection: PoolConnection;
+
+  try {
+    connection = await pool.getConnection();
+    const inStream = createReadStream(POSTAL_TEXT_FILE, 'utf8');
+    const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+    let index = 0;
+
+    for await (const line of lines) {
+      const parts = line.split('\t').map(p => p.trim());
+      const [country, code, name, , admin1] = parts;
+      const [latitude, longitude, accuracy] = parts.slice(9).map(p => toNumber(p));
+      const iso3 = code2ToCode3[country];
+      let geonames_id = 0;
+      let gazetteer_id = 0;
+      let timezone = '';
+
+      let query = `SELECT id, geonames_id, timezone FROM gazetteer WHERE name = ? AND country = ? AND admin1 = ?
+            AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
+      let values: any[] = [name, iso3, admin1, latitude, longitude];
+      const result = await connection.queryResults(query, values);
+
+      if (result?.length > 0) {
+        geonames_id = result[0].geonames_id;
+        gazetteer_id = result[0].id;
+        timezone = result[0].timezone;
+      }
+      else
+        timezone = await findTimezoneInDb(connection, latitude, longitude);
+
+      if (timezone) {
+        query = `INSERT INTO gazetteer_postal
+          (country, code, name, admin1, latitude, longitude, accuracy,
+           timezone, geonames_id, gazetteer_id, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name = ?, latitude = ?, longitude = ?, accuracy = ?,
+             timezone = ?, geonames_id = ?, gazetteer_id = ?, source = ?, time_stamp = now()`;
+        values = [country, code, name, admin1, latitude, longitude, accuracy,
+                  timezone, geonames_id, gazetteer_id, 'GEON',
+                  name, latitude, longitude, accuracy,
+                  timezone, geonames_id, gazetteer_id, 'GEON'];
+      }
+
+      await connection.queryResults(query, values);
+
+      if (++index % 10000 === 0)
+        console.log(`${index} alternate names processed`);
+    }
+  }
+  catch (err) {
+    console.error(err.toString());
+  }
+
+  connection?.release();
+}
+
 (async (): Promise<void> => {
   try {
     await checkUnzip();
@@ -372,10 +464,10 @@ async function processAltNames(): Promise<void> {
       await readGeoData(CITIES_15000_TEXT_FILE);
       await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
       await updatePrimaryTables();
+      await processAltNames();
     }
 
-    await processAltNames();
-
+    await processPostalCodes();
     process.exit(0);
   }
   catch (err) {
