@@ -3,6 +3,8 @@
 
 // Match vowels (including `Y`).
 
+import unidecode from 'unidecode-plus';
+
 const vowels = /[AEIOUY]/;
 
 // Match few Slavo-Germanic values.
@@ -62,7 +64,8 @@ export function doubleMetaphone(value: string): string[] {
   let previous: string;
   let nextNext: string;
 
-  value = String(value).toUpperCase() + '     ';
+  // KS: unidecode() call is a change from the original code.
+  value = unidecode(String(value).toUpperCase(), { skipRanges: [[0xC7, 0xC7], [0xD1, 0xD1]] }) + '     ';
   const isSlavoGermanic = slavoGermanic.test(value);
   const isGermanic = germanic.test(value);
   const characters = value.split('');

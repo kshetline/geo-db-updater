@@ -1,7 +1,7 @@
 import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
-import { toBoolean, toNumber } from '@tubular/util';
+import { regexEscape, toBoolean, toNumber } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
@@ -9,7 +9,6 @@ import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
 import { admin1s, admin2s, code2ToCode3, countries, initGazetteer, makeKey, processPlaceNames } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
-import unidecode from 'unidecode-plus';
 import { doubleMetaphone } from './double-metaphone';
 
 const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
@@ -93,7 +92,13 @@ async function checkUnzip(): Promise<void> {
 }
 
 async function getTimezoneShapes(): Promise<FeatureCollection> {
-  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, { headers: { 'User-Agent': FAKE_USER_AGENT } });
+  const options = { headers: { 'User-Agent': FAKE_USER_AGENT } } as any;
+  const gitHubToken = process.env.GITHUB_TOKEN;
+
+  if (gitHubToken)
+    options.headers.Authorization = 'token ' + gitHubToken;
+
+  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, options);
   const asset = releaseInfo?.assets?.find((asset: any) => asset.name === 'timezones-with-oceans.geojson.zip');
 
   if (!asset.browser_download_url)
@@ -125,6 +130,12 @@ function presortTimezones(timezones: FeatureCollection): void {
         zoneGrid[x % 24][y].push(shape);
     }
   });
+}
+
+let doList = '';
+
+function shouldDo(step: string): boolean {
+  return doList === 'all' || new RegExp('\\b' + regexEscape(step) + '\\b').test(doList);
 }
 
 async function getGeoData(): Promise<void> {
@@ -163,7 +174,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
 
     if (p) {
       let rank = (featureClass === 'T' ? 0 : (level === 0 ? 2 : 1));
-      const metaphone = doubleMetaphone(unidecode(name, { skipRanges: [[0xA0, 0xFF]] }));
+      const metaphone = doubleMetaphone(name);
 
       if (featureClass === 'P') {
         if (feature_code === 'P.PPLC')
@@ -321,7 +332,8 @@ async function processAltNames(): Promise<void> {
       let type = '';
       let gazetteer_id = 0;
       let origName = '';
-      const tables = lang.length < 4 ? ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
+      const tables = name && lang.length < 4 && lang !== 'got' ?
+        ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
         const query = `SELECT id, name FROM ${tables[i]} WHERE geonames_id = ?`;
@@ -460,10 +472,12 @@ async function processPostalCodes(): Promise<void> {
 }
 
 (async (): Promise<void> => {
+  doList = process.argv.find(arg => arg.startsWith('--do='))?.substring(5) || '';
+
   try {
     await checkUnzip();
 
-    if (toBoolean(process.env.DB_GET_TIMEZONE_SHAPES)) {
+    if (shouldDo('shapes')) {
       const timezones = await getTimezoneShapes();
 
       timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
@@ -472,11 +486,18 @@ async function processPostalCodes(): Promise<void> {
 
     await getGeoData();
     await initGazetteer();
-    await readGeoData(CITIES_15000_TEXT_FILE);
-    await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
-    await updatePrimaryTables();
-    await processAltNames();
-    await processPostalCodes();
+
+    if (shouldDo('main')) {
+      await readGeoData(CITIES_15000_TEXT_FILE);
+      await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1);
+      await updatePrimaryTables();
+    }
+
+    if (shouldDo('alt'))
+      await processAltNames();
+
+    if (shouldDo('postal'))
+      await processPostalCodes();
 
     process.exit(0);
   }
