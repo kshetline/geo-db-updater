@@ -147,12 +147,12 @@ async function readGeoData(file: string, level = 0): Promise<void> {
 
   for await (const line of lines) {
     const parts = line.split('\t');
-    const [geonamesId, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
+    const [geonames_id, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
     const [, name, , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const feature_code = featureClass + '.' + featureCode;
 
-    if (!name || name.includes(',') || geoNamesLookup.has(geonamesId) || admin1 === '0Z' ||
+    if (!name || name.includes(',') || geoNamesLookup.has(geonames_id) || admin1 === '0Z' ||
         !/[PT]/i.test(featureClass) ||
         (featureClass === 'P' && !(population > 1000 || /PPLA|PPLA2|PPLA3|PPLC|PPLG/i.test(featureClass))) ||
         (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode)) ||
@@ -180,7 +180,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
       const location = {
         name: p.city,
         key_name: makeKey(name),
-        geonamesId,
+        geonames_id,
         source: 'GEON',
         variants: altNames.split(','),
         admin2,
@@ -201,7 +201,7 @@ async function readGeoData(file: string, level = 0): Promise<void> {
         delete location.mphone2;
 
       places.push(location);
-      geoNamesLookup.set(geonamesId, location);
+      geoNamesLookup.set(geonames_id, location);
 
       if (places.length % 50000 === 0)
         console.log('size:', places.length);
