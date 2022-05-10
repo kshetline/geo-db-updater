@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
-import { admin1s, admin2s, code2ToCode3, countries, initGazetteer, makeKey, processPlaceNames } from './gazetteer';
+import { admin1s, admin2s, code2ToCode3, countries, initGazetteer, makeKey, processPlaceNames, roughDistanceBetweenLocationsInKm } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
 
@@ -322,33 +322,50 @@ async function processAltNames(): Promise<void> {
     connection = await pool.getConnection();
     const inStream = createReadStream(ALT_NAMES_TEXT_FILE, 'utf8');
     const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+    const idMap: Map<number, { geonames_id: number, id: number, name: string }>[] = [];
     let index = 0;
 
     for await (const line of lines) {
+      if (index < 8090000) {
+        ++index;
+        continue;
+      }
+
       const parts = line.split('\t').map(p => p.trim());
       const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
       const [, , lang, name] = parts;
+      const key_name = makeKey(name);
 
       let type = '';
       let gazetteer_id = 0;
       let origName = '';
-      const tables = name && lang.length < 4 && lang !== 'got' ?
+      const tables = key_name && lang.length < 4 && lang !== 'ber' && lang !== 'got' ?
         ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
-        const query = `SELECT id, name FROM ${tables[i]} WHERE geonames_id = ?`;
-        const result = await connection.queryResults(query, [geonames_orig_id]);
+        if (idMap[i] == null) {
+          const query = `SELECT id, name, geonames_id FROM ${tables[i]} WHERE 1`;
+          const result = await connection.queryResults(query, [geonames_orig_id]);
 
-        if (result?.length > 0) {
+          idMap[i] = new Map();
+
+          if (result) {
+            result.forEach((row: any) => idMap[i].set(row.geonames_id, row));
+            console.log('populated id map for %s', tables[i]);
+          }
+        }
+
+        const match = idMap[i].get(geonames_orig_id);
+
+        if (match) {
           type = 'P21C'.charAt(i);
-          gazetteer_id = result[0].id;
-          origName = result[0].name;
+          gazetteer_id = match.id;
+          origName = match.name;
           break;
         }
       }
 
       if (type && gazetteer_id && origName !== name) {
-        const key_name = makeKey(name);
         const query = `INSERT INTO gazetteer_alt_names
           (name, lang, key_name, geonames_alt_id, geonames_orig_id, gazetteer_id, type, source,
            preferred, short, colloquial, historic, misspelling) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -471,8 +488,43 @@ async function processPostalCodes(): Promise<void> {
   connection?.release();
 }
 
+async function legacyItems(): Promise<void> {
+  let connection: PoolConnection;
+
+  try {
+    connection = await pool.getConnection();
+    const oldItems = await connection.queryResults('SELECT * FROM atlas2 where `source` IN (4, 5, 6, 99, 104)');
+
+    if (oldItems?.length > 0) {
+      for (const row of oldItems) {
+        if (/\b(Addition|Acres|Area|Camp|Campground|Church|Country Club|Division|Estates|Farms|Gardens|Park|Place|Subdivision|Trailer)\b/i.test(row.name))
+          continue;
+
+        const query = `SELECT * FROM atlas2 WHERE item_no != ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
+        const values = [row.item_no, row.latitude, row.longitude];
+        const results = ((await connection.queryResults(query, values)) || []).filter((loc: any) =>
+          roughDistanceBetweenLocationsInKm(row.latitude, row.longitude, loc.latitude, loc.longitude) <= 3 &&
+          row.feature_type.charAt(0) === loc.feature_type.charAt(0));
+
+        if (results.length > 0) {
+          console.log(row.name, row.admin1 || '-', row.country, ': close neighbors:', results.length);
+          console.log('   ', results.map((loc: any) => loc.name).join('; '));
+        }
+      }
+    }
+  }
+  catch (err) {
+    console.error(err.toString());
+  }
+
+  connection?.release();
+}
+
 (async (): Promise<void> => {
   doList = process.argv.find(arg => arg.startsWith('--do='))?.substring(5) || '';
+
+  if (doList === 'std')
+    doList = 'shapes;main;alt;postal';
 
   try {
     await checkUnzip();
@@ -498,6 +550,9 @@ async function processPostalCodes(): Promise<void> {
 
     if (shouldDo('postal'))
       await processPostalCodes();
+
+    if (shouldDo('legacy'))
+      await legacyItems();
 
     process.exit(0);
   }
