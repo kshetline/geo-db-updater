@@ -326,11 +326,6 @@ async function processAltNames(): Promise<void> {
     let index = 0;
 
     for await (const line of lines) {
-      if (index < 8090000) {
-        ++index;
-        continue;
-      }
-
       const parts = line.split('\t').map(p => p.trim());
       const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
       const [, , lang, name] = parts;
