@@ -166,7 +166,9 @@ async function readGeoData(file: string, level = 0): Promise<void> {
     if (!name || name.includes(',') || geoNamesLookup.has(geonames_id) || admin1 === '0Z' ||
         !/[PT]/i.test(featureClass) ||
         (featureClass === 'P' && !(population > 1000 || /PPLA|PPLA2|PPLA3|PPLC|PPLG/i.test(featureClass))) ||
+        (featureClass === 'P' && level > 0 && /[/()[\]]/.test(name)) ||
         (featureClass === 'T' && !/^(ATOL|CAPE|ISL|ISLET|MT|PK|PT|VLC)$/i.test(featureCode)) ||
+        (featureClass === 'T' && /^(((Hill|Number|Peak) \d+)|(\b\d+ (Hill|Islet)))$/i.test(featureCode)) ||
         (featureClass === 'T' && elevation < 600 && /^(MT|PK)$/i.test(featureCode)))
       continue;
 
@@ -334,7 +336,7 @@ async function processAltNames(): Promise<void> {
       let type = '';
       let gazetteer_id = 0;
       let origName = '';
-      const tables = key_name && lang.length < 4 && lang !== 'ber' && lang !== 'got' ?
+      const tables = key_name && lang.length < 3 ?
         ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
@@ -432,17 +434,26 @@ async function processPostalCodes(): Promise<void> {
       let gazetteer_id = 0;
       let timezone = '';
 
-      let query = `SELECT id, geonames_id, timezone, latitude, longitude
+      let query = `SELECT id, geonames_id, timezone, latitude, longitude, source
                      FROM gazetteer WHERE name = ? AND country = ? AND admin1 = ?
                      AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
       let values: any[] = [name, iso3, admin1, latitude, longitude];
       let result = await connection.queryResults(query, values);
+      let alreadyCopied = false;
 
       if (!result || result.length === 0) {
         query = `SELECT id, geonames_id, timezone, latitude, longitude FROM gazetteer
                    WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name = ?) AND
                      country = ? AND admin1 = ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
         result = await connection.queryResults(query, values);
+      }
+      else {
+        for (const loc of result) {
+          if (loc.name === name && loc.source === 'GEOZ' && loc.geonames_id === 0) {
+            alreadyCopied = true;
+            break;
+          }
+        }
       }
 
       if (result?.length > 0) {
@@ -460,6 +471,21 @@ async function processPostalCodes(): Promise<void> {
         timezone = await findTimezoneInDb(connection, latitude, longitude);
 
       if (timezone) {
+        if (!alreadyCopied && geonames_id === 0 && gazetteer_id === 0) {
+          const metaphone = doubleMetaphone(name);
+
+          if (metaphone[1] === metaphone[0])
+            metaphone[1] = null;
+
+          query = `INSERT INTO gazetteer
+            (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, rank, feature_code,
+             mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+          values = [makeKey(name), name, null, admin1, country, latitude, longitude, 0, 0, 1, 'P.PPL',
+                    metaphone[0], metaphone[1], 'GEOZ', 0];
+          await connection.queryResults(query, values);
+          gazetteer_id = toNumber((await connection.queryResults(`SELECT LAST_INSERT_ID()`) || [])[0]);
+        }
+
         query = `INSERT INTO gazetteer_postal
                    (country, code, name, admin1, latitude, longitude, accuracy,
                     timezone, geonames_id, gazetteer_id, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -166,7 +166,7 @@ function eqci(s1: string, s2: string): boolean {
 }
 
 export function makeKey(name: string): string {
-  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z]+/g, '').substring(0, 40);
+  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z\d]+/g, '').substring(0, 40);
 }
 
 export async function initGazetteer(): Promise<void> {
