@@ -440,7 +440,7 @@ async function processPostalCodes(): Promise<void> {
 
       if (!result || result.length === 0) {
         query = `SELECT id, geonames_id, timezone, latitude, longitude FROM gazetteer
-                   WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name = ?)
+                   WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name = ?) AND
                      country = ? AND admin1 = ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
         result = await connection.queryResults(query, values);
       }
