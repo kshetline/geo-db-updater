@@ -1,7 +1,7 @@
 import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
-import { isAllUppercase, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
+import { isAllUppercaseWords, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
@@ -480,7 +480,7 @@ async function processPostalCodes(): Promise<void> {
           const metaphone = doubleMetaphone(name);
           let casedName = name;
 
-          if (isAllUppercase(casedName))
+          if (isAllUppercaseWords(casedName))
             casedName = toTitleCase(casedName);
 
           if (metaphone[1] === metaphone[0])
