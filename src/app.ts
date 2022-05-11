@@ -1,7 +1,7 @@
 import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
-import { regexEscape, toBoolean, toNumber } from '@tubular/util';
+import { isAllUppercase, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
@@ -437,7 +437,7 @@ async function processPostalCodes(): Promise<void> {
       let timezone = '';
 
       let query = `SELECT id, geonames_id, timezone, latitude, longitude, source
-                     FROM gazetteer WHERE name = ? AND country = ? AND admin1 = ?
+                     FROM gazetteer WHERE name LIKE ? AND country = ? AND admin1 = ?
                      AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
       let values: any[] = [name, iso3, admin1, latitude, longitude];
       let result = await connection.queryResults(query, values);
@@ -445,7 +445,7 @@ async function processPostalCodes(): Promise<void> {
 
       if (!result || result.length === 0) {
         query = `SELECT id, geonames_id, timezone, latitude, longitude FROM gazetteer
-                   WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name = ?) AND
+                   WHERE geonames_id IN (SELECT geonames_orig_id FROM gazetteer_alt_names WHERE name LIKE ?) AND
                      country = ? AND admin1 = ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
         result = await connection.queryResults(query, values);
       }
@@ -478,6 +478,10 @@ async function processPostalCodes(): Promise<void> {
       if (timezone) {
         if (!alreadyCopied && geonames_id === 0 && gazetteer_id === 0) {
           const metaphone = doubleMetaphone(name);
+          let casedName = name;
+
+          if (isAllUppercase(casedName))
+            casedName = toTitleCase(casedName);
 
           if (metaphone[1] === metaphone[0])
             metaphone[1] = null;
@@ -486,7 +490,7 @@ async function processPostalCodes(): Promise<void> {
             (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone,
              rank, feature_code, mphone1, mphone2, source, geonames_id)
              values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-          values = [makeKey(name), name, '', admin1, iso3, latitude, longitude, 0, 0, timezone, 1, 'P.PPL',
+          values = [makeKey(name), casedName, '', admin1, iso3, latitude, longitude, 0, 0, timezone, 1, 'P.PPL',
                     metaphone[0], metaphone[1], 'GEOZ', 0];
           await connection.queryResults(query, values);
           gazetteer_id = toNumber((await connection.queryResults(`SELECT LAST_INSERT_ID()`) || [])[0]);
