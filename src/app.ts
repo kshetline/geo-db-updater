@@ -296,7 +296,10 @@ async function updatePrimaryTables(): Promise<void> {
                       loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone,
                       loc.rank, loc.source, loc.geonames_id];
 
-      await connection.queryResults(query, values);
+      if (loc.timezone)
+        await connection.queryResults(query, values);
+      else
+        console.log('Missing timezone:', JSON.stringify(loc));
 
       const percent = floor(++index * 1000 / places.length) / 10;
 
