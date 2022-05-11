@@ -286,7 +286,7 @@ async function updatePrimaryTables(): Promise<void> {
     for (const loc of places) {
       const query = `INSERT INTO gazetteer
         (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone,
-         rank, feature_code, mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         rank, feature_code, mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            latitude = ?, longitude = ?, elevation = ?, population = ?, timezone = ?, rank = ?, source = ?,
            geonames_id = ?, time_stamp = now()`;
