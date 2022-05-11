@@ -482,10 +482,11 @@ async function processPostalCodes(): Promise<void> {
           if (metaphone[1] === metaphone[0])
             metaphone[1] = null;
 
-          query = `INSERT INTO gazetteer
-            (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, rank, feature_code,
-             mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-          values = [makeKey(name), name, '', admin1, iso3, latitude, longitude, 0, 0, 1, 'P.PPL',
+          query = `INSERT IGNORE INTO gazetteer
+            (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone,
+             rank, feature_code, mphone1, mphone2, source, geonames_id)
+             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+          values = [makeKey(name), name, '', admin1, iso3, latitude, longitude, 0, 0, timezone, 1, 'P.PPL',
                     metaphone[0], metaphone[1], 'GEOZ', 0];
           await connection.queryResults(query, values);
           gazetteer_id = toNumber((await connection.queryResults(`SELECT LAST_INSERT_ID()`) || [])[0]);
