@@ -262,8 +262,7 @@ async function updatePrimaryTables(): Promise<void> {
       for (const loc of admins.values()) {
         const query = `INSERT INTO gazetteer_admin${i}
           (name, key_name, code, geonames_id, source) values (?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             name = ?, code = ?, geonames_id = ?, source = ?, time_stamp = now()`;
+           ON DUPLICATE KEY UPDATE name = ?, code = ?, geonames_id = ?, source = ?, time_stamp = now()`;
         const values = [loc.name, loc.key_name, loc.code, loc.geonames_id, loc.source,
                         loc.name, loc.code, loc.geonames_id, loc.source];
 
@@ -286,16 +285,16 @@ async function updatePrimaryTables(): Promise<void> {
 
     for (const loc of places) {
       const query = `INSERT INTO gazetteer
-        (key_name, name, admin2, admin1, country,
-         latitude, longitude, elevation, population, rank, feature_code,
-         mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone,
+         rank, feature_code, mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
-           latitude = ?, longitude = ?, elevation = ?, population = ?, rank = ?, source = ?, geonames_id = ?,
-           time_stamp = now()`;
+           latitude = ?, longitude = ?, elevation = ?, population = ?, timezone = ?, rank = ?, source = ?,
+           geonames_id = ?, time_stamp = now()`;
       const values = [loc.key_name, loc.name, loc.admin2, loc.admin1, loc.country,
-                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.feature_code,
-                      loc.mphone1, loc.mphone2, loc.source, loc.geonames_id,
-                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.rank, loc.source, loc.geonames_id];
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone,
+                      loc.rank, loc.feature_code, loc.mphone1, loc.mphone2, loc.source, loc.geonames_id,
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone,
+                      loc.rank, loc.source, loc.geonames_id];
 
       await connection.queryResults(query, values);
 
@@ -392,14 +391,14 @@ async function findTimezoneInDb(connection: PoolConnection, lat: number, lon: nu
     const query = `SELECT timezone FROM gazetteer
                      WHERE latitude >= ? AND latitude <= ? AND longitude >= ? AND longitude <= ?`;
     const results = (await connection.queryResults(query, [lat - span, lat + span, lon - span, lon + span])) || [];
-    let timeZoneId: string;
+    let timezone: string;
     let country: string;
 
     for (const result of results) {
-      if (result.time_zone) {
-        if (!timeZoneId)
-          timeZoneId = result.time_zone;
-        else if (timeZoneId !== result.time_zone)
+      if (result.timezone) {
+        if (!timezone)
+          timezone = result.timezone;
+        else if (timezone !== result.timezone)
           break zoneLoop;
 
         if (!country)
@@ -409,8 +408,8 @@ async function findTimezoneInDb(connection: PoolConnection, lat: number, lon: nu
       }
     }
 
-    if (timeZoneId)
-      return timeZoneId;
+    if (timezone)
+      return timezone;
   }
 
   return null;
@@ -470,6 +469,9 @@ async function processPostalCodes(): Promise<void> {
       if (!timezone)
         timezone = await findTimezoneInDb(connection, latitude, longitude);
 
+      if (!timezone)
+        timezone = findTimezone(latitude, longitude);
+
       if (timezone) {
         if (!alreadyCopied && geonames_id === 0 && gazetteer_id === 0) {
           const metaphone = doubleMetaphone(name);
@@ -480,7 +482,7 @@ async function processPostalCodes(): Promise<void> {
           query = `INSERT INTO gazetteer
             (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, rank, feature_code,
              mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-          values = [makeKey(name), name, null, admin1, country, latitude, longitude, 0, 0, 1, 'P.PPL',
+          values = [makeKey(name), name, null, admin1, iso3, latitude, longitude, 0, 0, 1, 'P.PPL',
                     metaphone[0], metaphone[1], 'GEOZ', 0];
           await connection.queryResults(query, values);
           gazetteer_id = toNumber((await connection.queryResults(`SELECT LAST_INSERT_ID()`) || [])[0]);
