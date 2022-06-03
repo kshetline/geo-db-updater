@@ -357,7 +357,7 @@ async function processAltNames(): Promise<void> {
         const match = idMap[i].get(geonames_orig_id);
 
         if (match) {
-          type = 'P21C'.charAt(i);
+          type = 'C12P'.charAt(i);
           gazetteer_id = match.id;
           origName = match.name;
           break;
