@@ -335,16 +335,19 @@ async function processAltNames(): Promise<void> {
       const [, , lang, name] = parts;
       const key_name = makeKey(name);
 
+      if (geonames_alt_id !== 1894791)
+        continue;
+
       let type = '';
       let gazetteer_id = 0;
       let origName = '';
       const tables = key_name && lang.length < 3 ?
-        ['gazetteer', 'gazetteer_admin2', 'gazetteer_admin1', 'gazetteer_countries'] : [];
+        ['gazetteer_countries', 'gazetteer_admin1', 'gazetteer_admin2', 'gazetteer'] : [];
 
       for (let i = 0; i < tables.length; ++i) {
         if (idMap[i] == null) {
           const query = `SELECT id, name, geonames_id FROM ${tables[i]} WHERE 1`;
-          const result = await connection.queryResults(query, [geonames_orig_id]);
+          const result = await connection.queryResults(query);
 
           idMap[i] = new Map();
 
