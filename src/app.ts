@@ -335,9 +335,6 @@ async function processAltNames(): Promise<void> {
       const [, , lang, name] = parts;
       const key_name = makeKey(name);
 
-      if (geonames_alt_id !== 1894791)
-        continue;
-
       let type = '';
       let gazetteer_id = 0;
       let origName = '';
