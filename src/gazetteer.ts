@@ -1,7 +1,7 @@
 import { readdirSync } from 'fs';
 import { acos, cos_deg, PI, sin_deg } from '@tubular/math';
 import { join as pathJoin } from 'path';
-import { makePlainASCII_UC, stripLatinDiacriticals, toNumber } from '@tubular/util';
+import { asLines, makePlainASCII_UC, stripLatinDiacriticals, toNumber } from '@tubular/util';
 import { requestText } from 'by-request';
 import { readFile } from 'fs/promises';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
@@ -54,6 +54,7 @@ export interface AdminEntity {
 
 export const admin1s = new Map<number, AdminEntity>();
 export const admin2s = new Map<number, AdminEntity>();
+const postalAdmin1s: Record<string, string> = {};
 
 const longStates: Record<string, string> = {};
 const stateAbbreviations: Record<string, string> = {};
@@ -166,7 +167,9 @@ function eqci(s1: string, s2: string): boolean {
 }
 
 export function makeKey(name: string): string {
-  return unidecode(name, { german: true }).toUpperCase().replace(/[^A-Z\d]+/g, '').substring(0, 40);
+  return unidecode(name.trim()
+    .replace(/^['’][st][- ]\s+/i, ''), // Remove 's- and 't- prefixes
+    { german: true }).toUpperCase().replace(/[^A-Z\d]+/g, '').replace(/^0+([1-9])/, '$1').substring(0, 40);
 }
 
 export async function initGazetteer(): Promise<void> {
@@ -178,7 +181,7 @@ export async function initGazetteer(): Promise<void> {
     await getPossiblyCachedFile(STATE_INFO_TEXT_FILE, STATE_INFO_URL, 'state-info', opts);
     await getPossiblyCachedFile(COUNTY_INFO_TEXT_FILE, COUNTY_INFO_URL, 'county-info', opts);
 
-    let lines = (await readFile(COUNTRY_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
+    let lines = asLines(await readFile(COUNTRY_INFO_TEXT_FILE, 'utf8'));
 
     lines.forEach(line => {
       if (line.startsWith('#'))
@@ -208,7 +211,7 @@ export async function initGazetteer(): Promise<void> {
       }
     });
 
-    lines = (await readFile(STATE_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
+    lines = asLines(await readFile(STATE_INFO_TEXT_FILE, 'utf8'));
 
     lines.forEach(line => {
       const parts = line.split(/\t/).map(p => p.trim());
@@ -226,7 +229,7 @@ export async function initGazetteer(): Promise<void> {
       }
     });
 
-    lines = (await readFile(COUNTY_INFO_TEXT_FILE, 'utf8')).split(/\r\n|\n|\r/);
+    lines = asLines(await readFile(COUNTY_INFO_TEXT_FILE, 'utf8'));
 
     lines.forEach(line => {
       const parts = line.split(/\t/).map(p => p.trim());
@@ -244,13 +247,20 @@ export async function initGazetteer(): Promise<void> {
       }
     });
 
-    lines = (await readFile('src/data/us_counties.txt', 'utf8')).split(/\r\n|\n|\r/);
+    lines = asLines(await readFile('src/data/us_counties.txt', 'utf8'));
     lines.forEach(line => usCounties.add(line.trim()));
     // Add this fake county to suppress errors when DC is reported at the county level of a place hierarchy.
     usCounties.add('Washington, DC');
 
-    lines = (await readFile('src/data/celestial.txt', 'utf8')).split(/\r\n|\n|\r/);
+    lines = asLines(await readFile('src/data/celestial.txt', 'utf8'));
     lines.forEach(line => celestialNames.add(makePlainASCII_UC(line.trim())));
+
+    lines = asLines(await readFile('data/postal-admin1-conversions.txt', 'utf8'));
+
+    lines.forEach(line => {
+      const [key, code] = line.split(':');
+      postalAdmin1s[key] = code;
+    });
   }
   catch (err) {
     console.error('Gazetteer init error: ' + err);
@@ -277,7 +287,7 @@ async function initFlagCodes(): Promise<void> {
   catch (err) { /* Ignore error, proceed to remote retrieval. */ }
 
   try {
-    const lines = (await requestText('https://skyviewcafe.com/assets/resources/flags/')).split(/\r\n|\n|\r/);
+    const lines = asLines(await requestText('https://skyviewcafe.com/assets/resources/flags/'));
 
     lines.forEach(line => {
       const $ = />(\w+)\.png</.exec(line);
@@ -702,4 +712,8 @@ export function getStatesProvincesAndCountries(): NameAndCode[] {
   results.push(null, ...countries);
 
   return results;
+}
+
+export function convertPostalAdmin1(iso2Country: string, admin1: string): string {
+  return postalAdmin1s[iso2Country + '.' + admin1] || admin1;
 }

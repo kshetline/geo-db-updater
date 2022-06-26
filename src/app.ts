@@ -1,13 +1,13 @@
 import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
-import { isAllUppercaseWords, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
+import { isAllUppercaseWords, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
-import { admin1s, admin2s, code2ToCode3, countries, initGazetteer, makeKey, processPlaceNames, roughDistanceBetweenLocationsInKm } from './gazetteer';
+import { admin1s, admin2s, code2ToCode3, convertPostalAdmin1, countries, initGazetteer, makeKey, processPlaceNames, roughDistanceBetweenLocationsInKm } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
 
@@ -32,6 +32,10 @@ const ALT_NAMES_TEXT_FILE = 'cache/alternateNames.txt';
 const POSTAL_URL = 'https://download.geonames.org/export/zip/allCountries.zip';
 const POSTAL_FILE = 'cache/allCountriesPostal.zip';
 const POSTAL_TEXT_FILE = 'cache/allCountriesPostal.txt';
+
+/* cspell:disable-next-line */ // noinspection SpellCheckingInspection
+const POSTAL_JUNK = regex`(\d+-)|(\b(avenue|drive|escuela|kilometro|kilómetro|lane|lorong|lote|street|way) \d+)|
+  (\b(markaz|sección|sector)$)|(\b(&amp;|box#|cpo-po|office|zone)\b)|(\b\d+\/\d+\b)|(^(chak|\w\d)\b)${'i'}`;
 
 interface Location {
   name: string;
@@ -157,9 +161,10 @@ async function readGeoData(file: string, level = 0): Promise<void> {
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
 
   for await (const line of lines) {
-    const parts = line.split('\t');
+    const parts = line.split('\t').map(p => p.trim());
     const [geonames_id, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
-    const [, name, , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    const name = parts[1].replace(/^"(.+)"$/, '$1');
+    const [, , , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const feature_code = featureClass + '.' + featureCode;
 
@@ -332,7 +337,12 @@ async function processAltNames(): Promise<void> {
     for await (const line of lines) {
       const parts = line.split('\t').map(p => p.trim());
       const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
-      const [, , lang, name] = parts;
+      const lang = parts[2];
+      const name = parts[3].replace(/^"(.+)"$/, '$1');
+
+      if (!/\p{L}/u.test(name)) // Ignore anything with no alphabetic content
+        continue;
+
       const key_name = makeKey(name);
 
       let type = '';
@@ -429,7 +439,9 @@ async function processPostalCodes(): Promise<void> {
 
     for await (const line of lines) {
       const parts = line.split('\t').map(p => p.trim());
-      const [country, code, name, , admin1] = parts;
+      const [country, code] = parts;
+      const name = parts[2].replace(/^"(.+)"$/, '$1');
+      const admin1 = convertPostalAdmin1(country, parts[4]);
       let [latitude, longitude, accuracy] = parts.slice(9).map(p => toNumber(p));
       const iso3 = code2ToCode3[country];
       let geonames_id = 0;
@@ -475,7 +487,7 @@ async function processPostalCodes(): Promise<void> {
       if (!timezone)
         timezone = findTimezone(latitude, longitude);
 
-      if (timezone) {
+      if (timezone && !POSTAL_JUNK.test(name)) {
         if (!alreadyCopied && geonames_id === 0 && gazetteer_id === 0) {
           const metaphone = doubleMetaphone(name);
           let casedName = name;
@@ -492,8 +504,7 @@ async function processPostalCodes(): Promise<void> {
              values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
           values = [makeKey(name), casedName, '', admin1, iso3, latitude, longitude, 0, 0, timezone, 1, 'P.PPL',
                     metaphone[0], metaphone[1], 'GEOZ', 0];
-          await connection.queryResults(query, values);
-          gazetteer_id = toNumber((await connection.queryResults(`SELECT LAST_INSERT_ID()`) || [])[0]);
+          gazetteer_id = (await connection.query(query, values)).insertId;
         }
 
         query = `INSERT INTO gazetteer_postal
@@ -503,8 +514,8 @@ async function processPostalCodes(): Promise<void> {
                       name = ?, latitude = ?, longitude = ?, accuracy = ?,
                       timezone = ?, geonames_id = ?, gazetteer_id = ?, source = ?, time_stamp = now()`;
         values = [country, code, name, admin1, latitude, longitude, accuracy,
-                  timezone, geonames_id, gazetteer_id, 'GEON',
-                  name, latitude, longitude, accuracy, timezone, geonames_id, gazetteer_id, 'GEON'];
+                  timezone, geonames_id, gazetteer_id, 'GEOZ',
+                  name, latitude, longitude, accuracy, timezone, geonames_id, gazetteer_id, 'GEOZ'];
         await connection.queryResults(query, values);
       }
 

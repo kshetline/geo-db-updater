@@ -5,6 +5,7 @@ import { parse as parseUrl } from 'url';
 
 export interface FullQueryResults {
   err: MysqlError | null;
+  insertId?: number;
   results: any;
   fields: FieldInfo[];
 }
