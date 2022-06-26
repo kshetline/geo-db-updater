@@ -255,7 +255,7 @@ export async function initGazetteer(): Promise<void> {
     lines = asLines(await readFile('src/data/celestial.txt', 'utf8'));
     lines.forEach(line => celestialNames.add(makePlainASCII_UC(line.trim())));
 
-    lines = asLines(await readFile('data/postal-admin1-conversions.txt', 'utf8'));
+    lines = asLines(await readFile('src/data/postal-admin1-conversions.txt', 'utf8'));
 
     lines.forEach(line => {
       const [key, code] = line.split(':');
