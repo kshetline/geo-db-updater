@@ -504,7 +504,7 @@ async function processPostalCodes(): Promise<void> {
              values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
           values = [makeKey(name), casedName, '', admin1, iso3, latitude, longitude, 0, 0, timezone, 1, 'P.PPL',
                     metaphone[0], metaphone[1], 'GEOZ', 0];
-          gazetteer_id = (await connection.query(query, values)).insertId;
+          gazetteer_id = (await connection.query(query, values)).insertId || 0;
         }
 
         query = `INSERT INTO gazetteer_postal
