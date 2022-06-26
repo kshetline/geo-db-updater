@@ -168,7 +168,7 @@ function eqci(s1: string, s2: string): boolean {
 
 export function makeKey(name: string): string {
   return unidecode(name.trim()
-    .replace(/^['’][st][- ]\s+/i, ''), // Remove 's- and 't- prefixes
+    .replace(/^['’][st][- ]\s*/i, ''), // Remove 's- and 't- prefixes
     { german: true }).toUpperCase().replace(/[^A-Z\d]+/g, '').replace(/^0+([1-9])/, '$1').substring(0, 40);
 }
 

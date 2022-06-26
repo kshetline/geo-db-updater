@@ -142,6 +142,10 @@ function shouldDo(step: string): boolean {
   return doList === 'all' || new RegExp('\\b' + regexEscape(step) + '\\b').test(doList);
 }
 
+function dequote(s: string): string {
+  return s.replace(/^["“„](.+)["“”‟]$/, '$1');
+}
+
 async function getGeoData(): Promise<void> {
   await getPossiblyCachedFile(CITIES_15000_FILE, CITIES_15000_URL, 'cities-15000',
     { maxCacheAge: THREE_MONTHS, unzipPath: CITIES_15000_TEXT_FILE });
@@ -163,7 +167,11 @@ async function readGeoData(file: string, level = 0): Promise<void> {
   for await (const line of lines) {
     const parts = line.split('\t').map(p => p.trim());
     const [geonames_id, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
-    const name = parts[1].replace(/^"(.+)"$/, '$1');
+    const name = dequote(parts[1]);
+
+    if (!name)
+      continue;
+
     const [, , , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const feature_code = featureClass + '.' + featureCode;
@@ -338,7 +346,7 @@ async function processAltNames(): Promise<void> {
       const parts = line.split('\t').map(p => p.trim());
       const [geonames_alt_id, geonames_orig_id, , , preferred, short, colloquial, historic] = parts.map(p => toNumber(p));
       const lang = parts[2];
-      const name = parts[3].replace(/^"(.+)"$/, '$1');
+      const name = dequote(parts[3]);
 
       if (!/\p{L}/u.test(name)) // Ignore anything with no alphabetic content
         continue;
@@ -440,7 +448,7 @@ async function processPostalCodes(): Promise<void> {
     for await (const line of lines) {
       const parts = line.split('\t').map(p => p.trim());
       const [country, code] = parts;
-      const name = parts[2].replace(/^"(.+)"$/, '$1');
+      const name = dequote(parts[2]);
       const admin1 = convertPostalAdmin1(country, parts[4]);
       let [latitude, longitude, accuracy] = parts.slice(9).map(p => toNumber(p));
       const iso3 = code2ToCode3[country];
