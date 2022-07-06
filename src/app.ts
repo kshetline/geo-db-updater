@@ -1,7 +1,7 @@
 import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
-import { isAllUppercaseWords, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
+import { isAllUppercaseWords, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
 import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
@@ -157,10 +157,25 @@ async function getGeoData(): Promise<void> {
     { maxCacheAge: THREE_MONTHS, unzipPath: POSTAL_TEXT_FILE });
 }
 
+interface GridCell {
+  locations: {
+    admin1: string;
+    admin2: string;
+    countryCode: string;
+    timezone: string;
+  }[];
+  zones: Set<string>;
+}
+
 const places: Location[] = [];
+let zoneMap: Record<string, Record<string, number>>;
+const locationGrid: GridCell[][] = [];
 const geoNamesLookup = new Map<number, Location>();
 
-async function readGeoData(file: string, level = 0): Promise<void> {
+for (let x = 0; x < 3600; ++x)
+  locationGrid[x] = [];
+
+async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promise<void> {
   const inStream = createReadStream(file, 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
 
@@ -175,6 +190,23 @@ async function readGeoData(file: string, level = 0): Promise<void> {
     const [, , , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const feature_code = featureClass + '.' + featureCode;
+
+    if (countryCode && timezone) {
+      const x = floor(mod(longitude + 180, 360) * 10);
+      const y = floor((latitude + 90) * 10);
+      let cell = locationGrid[x][y];
+
+      if (!cell) {
+        cell = { locations: [], zones: new Set() };
+        locationGrid[x][y] = cell;
+      }
+
+      cell.locations.push({ admin1, admin2, countryCode, timezone });
+      cell.zones.add(timezone);
+    }
+
+    if (zoneMapOnly)
+      continue;
 
     if (!name || name.includes(',') || geoNamesLookup.has(geonames_id) || admin1 === '0Z' ||
         !/[PT]/i.test(featureClass) ||
@@ -496,12 +528,13 @@ async function processPostalCodes(): Promise<void> {
         timezone = findTimezone(latitude, longitude);
 
       if (timezone && !POSTAL_JUNK.test(name)) {
+        let casedName = name;
+
+        if (isAllUppercaseWords(casedName))
+          casedName = toTitleCase(casedName).replace(/\bAfb$/, 'AFB');
+
         if (!alreadyCopied && geonames_id === 0 && gazetteer_id === 0) {
           const metaphone = doubleMetaphone(name);
-          let casedName = name;
-
-          if (isAllUppercaseWords(casedName))
-            casedName = toTitleCase(casedName);
 
           if (metaphone[1] === metaphone[0])
             metaphone[1] = null;
@@ -543,25 +576,120 @@ async function legacyItems(): Promise<void> {
 
   try {
     connection = await pool.getConnection();
-    const oldItems = await connection.queryResults('SELECT * FROM atlas2 where `source` IN (4, 5, 6, 99, 104)');
+    const oldItems = await connection.queryResults('SELECT * FROM gazetteer_legacy');
+    let skipped = 0;
 
     if (oldItems?.length > 0) {
       for (const row of oldItems) {
-        if (/\b(Addition|Acres|Area|Camp|Campground|Church|Country Club|Division|Estates|Farms|Gardens|Park|Place|Subdivision|Trailer)\b/i.test(row.name))
+        if (/\b(Addition|Acres|Area|Camp|Campground|Church|Country Club|Division|Estates|Farms|Gardens|Park|Place|Subdivision|Trailer)\b/i.test(row.name)) {
+          ++skipped;
           continue;
+        }
 
-        const query = `SELECT * FROM atlas2 WHERE item_no != ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
+        const query = `SELECT * FROM gazetteer_legacy WHERE item_no != ? AND ABS(? - latitude) < 0.25 AND ABS(? - longitude) < 0.25`;
         const values = [row.item_no, row.latitude, row.longitude];
         const results = ((await connection.queryResults(query, values)) || []).filter((loc: any) =>
           roughDistanceBetweenLocationsInKm(row.latitude, row.longitude, loc.latitude, loc.longitude) <= 3 &&
-          row.feature_type.charAt(0) === loc.feature_type.charAt(0));
+          row.feature_code.charAt(0) === loc.feature_code.charAt(0));
 
         if (results.length > 0) {
-          console.log(row.name, row.admin1 || '-', row.country, ': close neighbors:', results.length);
+          console.log(`${row.name}, ${row.admin1 || '-'}, ${row.country}: close neighbors: ${results.length}`);
           console.log('   ', results.map((loc: any) => loc.name).join('; '));
         }
       }
+
+      console.log('\n\nskipped:', skipped);
     }
+  }
+  catch (err) {
+    console.error(err.toString());
+  }
+
+  connection?.release();
+}
+
+async function buildZoneLookup(): Promise<void> {
+  let connection: PoolConnection;
+
+  try {
+    if (!zoneMap)
+      await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1, true);
+
+    for (let x = 0; x < 3600; ++x) {
+      const col = locationGrid[x];
+
+      for (let y = 0; y < 1800; ++y) {
+        const cell = col[y];
+
+        if (cell?.zones.size > 1) {
+          for (let dx = -1; dx <= 1; ++dx) {
+            for (let dy = -1; dy <= 1; ++dy)
+              locationGrid[x + dx][y + dy] = null;
+          }
+        }
+        else if (cell?.locations.length < 10)
+          locationGrid[x][y] = null;
+      }
+    }
+
+    zoneMap = {};
+
+    for (let x = 0; x < 3600; ++x) {
+      const col = locationGrid[x];
+
+      for (let y = 0; y < 1800; ++y) {
+        const cell = col[y];
+
+        if (cell) {
+          for (const location of cell.locations) {
+            const country = location.countryCode;
+            const zone = location.timezone;
+            let zones = zoneMap[country];
+
+            if (!zones) {
+              zones = {};
+              zoneMap[country] = zones;
+            }
+
+            zones[zone] = (zones[zone] || 0) + 1;
+
+            if (location.admin1 && keyCount(zones) > 1) {
+              let key = country + '.' + location.admin1;
+              zones = zoneMap[key];
+
+              if (!zones) {
+                zones = {};
+                zoneMap[key] = zones;
+              }
+
+              zones[zone] = (zones[zone] || 0) + 1;
+
+              if (location.admin2 && keyCount(zones) > 1) {
+                key += '.' + location.admin2;
+                zones = zoneMap[key];
+
+                if (!zones) {
+                  zones = {};
+                  zoneMap[key] = zones;
+                }
+
+                zones[zone] = (zones[zone] || 0) + 1;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const locations = Object.keys(zoneMap).sort();
+    const summary: Record<string, string> = {};
+
+    for (const location of locations) {
+      const keys = Object.keys(zoneMap[location]).sort((a, b) => zoneMap[location][b] - zoneMap[location][a]);
+      summary[location] = keys.map(key => `${key} (${zoneMap[location][key]})`).join(', ');
+    }
+
+    console.log(JSON.stringify(summary, null, 2));
   }
   catch (err) {
     console.error(err.toString());
@@ -574,7 +702,7 @@ async function legacyItems(): Promise<void> {
   doList = process.argv.find(arg => arg.startsWith('--do='))?.substring(5) || '';
 
   if (doList === 'std')
-    doList = 'shapes;main;alt;postal';
+    doList = 'shapes;main;alt;postal;zones';
 
   try {
     await checkUnzip();
@@ -603,6 +731,9 @@ async function legacyItems(): Promise<void> {
 
     if (shouldDo('legacy'))
       await legacyItems();
+
+    if (shouldDo('zones'))
+      await buildZoneLookup();
 
     process.exit(0);
   }
