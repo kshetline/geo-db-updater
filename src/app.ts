@@ -7,7 +7,10 @@ import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
-import { admin1s, admin2s, code2ToCode3, convertPostalAdmin1, countries, initGazetteer, makeKey, processPlaceNames, roughDistanceBetweenLocationsInKm } from './gazetteer';
+import {
+  admin1s, admin2s, code2ToCode3, convertPostalAdmin1, countries, initGazetteer, makeKey, processPlaceNames,
+  roughDistanceBetweenLocationsInKm
+} from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
 
@@ -203,6 +206,13 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
 
       cell.locations.push({ admin1, admin2, countryCode, timezone });
       cell.zones.add(timezone);
+
+      if (countryCode === 'CA' && name.startsWith('Walpole')) {
+        const altZone = findTimezone(latitude, longitude);
+        if (altZone !== timezone) {
+          console.log(name, admin1, countryCode, timezone, altZone, latitude, longitude);
+        }
+      }
     }
 
     if (zoneMapOnly)
@@ -707,7 +717,7 @@ async function buildZoneLookup(): Promise<void> {
   try {
     await checkUnzip();
 
-    if (shouldDo('shapes')) {
+    if (shouldDo('shapes') || shouldDo('zones')) {
       const timezones = await getTimezoneShapes();
 
       timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
