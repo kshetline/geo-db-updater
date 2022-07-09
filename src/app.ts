@@ -160,27 +160,15 @@ async function getGeoData(): Promise<void> {
     { maxCacheAge: THREE_MONTHS, unzipPath: POSTAL_TEXT_FILE });
 }
 
-interface GridCell {
-  locations: {
-    admin1: string;
-    admin2: string;
-    countryCode: string;
-    timezone: string;
-  }[];
-  zones: Set<string>;
-}
-
 const places: Location[] = [];
 let zoneMap: Record<string, Record<string, number>>;
-const locationGrid: GridCell[][] = [];
 const geoNamesLookup = new Map<number, Location>();
-
-for (let x = 0; x < 3600; ++x)
-  locationGrid[x] = [];
 
 async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promise<void> {
   const inStream = createReadStream(file, 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+
+  zoneMap = {};
 
   for await (const line of lines) {
     const parts = line.split('\t').map(p => p.trim());
@@ -195,22 +183,36 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
     const feature_code = featureClass + '.' + featureCode;
 
     if (countryCode && timezone) {
-      const x = floor(mod(longitude + 180, 360) * 10);
-      const y = floor((latitude + 90) * 10);
-      let cell = locationGrid[x][y];
+      let zones = zoneMap[countryCode];
 
-      if (!cell) {
-        cell = { locations: [], zones: new Set() };
-        locationGrid[x][y] = cell;
+      if (!zones) {
+        zones = {};
+        zoneMap[countryCode] = zones;
       }
 
-      cell.locations.push({ admin1, admin2, countryCode, timezone });
-      cell.zones.add(timezone);
+      zones[timezone] = (zones[timezone] || 0) + 1;
 
-      if (countryCode === 'CA' && name.startsWith('Walpole')) {
-        const altZone = findTimezone(latitude, longitude);
-        if (altZone !== timezone) {
-          console.log(name, admin1, countryCode, timezone, altZone, latitude, longitude);
+      if (admin1 && keyCount(zones) > 1) {
+        let key = countryCode + '.' + admin1;
+        zones = zoneMap[key];
+
+        if (!zones) {
+          zones = {};
+          zoneMap[key] = zones;
+        }
+
+        zones[timezone] = (zones[timezone] || 0) + 1;
+
+        if (admin2 && keyCount(zones) > 1) {
+          key += '.' + admin2;
+          zones = zoneMap[key];
+
+          if (!zones) {
+            zones = {};
+            zoneMap[key] = zones;
+          }
+
+          zones[timezone] = (zones[timezone] || 0) + 1;
         }
       }
     }
@@ -624,72 +626,6 @@ async function buildZoneLookup(): Promise<void> {
   try {
     if (!zoneMap)
       await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1, true);
-
-    for (let x = 0; x < 3600; ++x) {
-      const col = locationGrid[x];
-
-      for (let y = 0; y < 1800; ++y) {
-        const cell = col[y];
-
-        if (cell?.zones.size > 1) {
-          for (let dx = -1; dx <= 1; ++dx) {
-            for (let dy = -1; dy <= 1; ++dy)
-              locationGrid[x + dx][y + dy] = null;
-          }
-        }
-        else if (cell?.locations.length < 10)
-          locationGrid[x][y] = null;
-      }
-    }
-
-    zoneMap = {};
-
-    for (let x = 0; x < 3600; ++x) {
-      const col = locationGrid[x];
-
-      for (let y = 0; y < 1800; ++y) {
-        const cell = col[y];
-
-        if (cell) {
-          for (const location of cell.locations) {
-            const country = location.countryCode;
-            const zone = location.timezone;
-            let zones = zoneMap[country];
-
-            if (!zones) {
-              zones = {};
-              zoneMap[country] = zones;
-            }
-
-            zones[zone] = (zones[zone] || 0) + 1;
-
-            if (location.admin1 && keyCount(zones) > 1) {
-              let key = country + '.' + location.admin1;
-              zones = zoneMap[key];
-
-              if (!zones) {
-                zones = {};
-                zoneMap[key] = zones;
-              }
-
-              zones[zone] = (zones[zone] || 0) + 1;
-
-              if (location.admin2 && keyCount(zones) > 1) {
-                key += '.' + location.admin2;
-                zones = zoneMap[key];
-
-                if (!zones) {
-                  zones = {};
-                  zoneMap[key] = zones;
-                }
-
-                zones[zone] = (zones[zone] || 0) + 1;
-              }
-            }
-          }
-        }
-      }
-    }
 
     const locations = Object.keys(zoneMap).sort();
     const summary: Record<string, string> = {};
