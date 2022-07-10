@@ -2,9 +2,9 @@ import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { isAllUppercaseWords, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
-import { floor, mod } from '@tubular/math';
+import { floor, mod, mod2 } from '@tubular/math';
 import { spawn } from 'child_process';
-import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon } from '@turf/turf';
+import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon, polygon, intersect } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
 import {
@@ -13,6 +13,7 @@ import {
 } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
+import { Timezone } from '@tubular/time';
 
 const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
 
@@ -67,25 +68,66 @@ export const pool = new Pool({
   database: 'skyviewcafe'
 });
 
-const zoneGrid: Feature[][][] = [];
-
-for (let x = 0; x < 24; ++x) {
-  zoneGrid[x] = [];
-
-  for (let y = 0; y < 12; ++y)
-    zoneGrid[x][y] = [];
-}
+let zoneGrid: Feature[][][];
+const nipigon = {
+  type: 'Feature',
+  properties: {
+    tzid: 'America/Nipigon'
+  },
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [-88.23448491923624, 48.952994735358004],
+        [-88.23487091064453, 48.953041076660156],
+        [-88.24162292480469, 48.9555549621582],
+        [-88.24617004394531, 48.9595947265625],
+        [-88.25310516357422, 48.97331619262696],
+        [-88.25745391845703, 48.992679595947266],
+        [-88.25802612304688, 48.995201110839844],
+        [-88.25543212890625, 49.00632095336914],
+        [-88.25821685791016, 49.01075744628906],
+        [-88.26227569580078, 49.0076904296875],
+        [-88.26441955566406, 48.9979248046875],
+        [-88.26039123535156, 48.98247528076172],
+        [-88.26238250732422, 48.97911071777344],
+        [-88.2685546875, 48.97565841674805],
+        [-88.2708740234375, 48.972530364990234],
+        [-88.2618408203125, 48.9589729309082],
+        [-88.2609177591477, 48.95022140807116],
+        [-88.26239687003915, 48.95244384292245],
+        [-88.43281365961772, 48.95277603939336],
+        [-88.43299780563895, 49.03916948894521],
+        [-88.23623908787941, 49.039253898519554],
+        [-88.23448491923624, 48.952994735358004]
+      ]
+    ]
+  }
+};
 
 function findTimezone(lat: number, lon: number): string {
-  const x = floor(mod(lon, 360) / 15);
-  const y = floor((lat + 90) / 15);
+  if (!zoneGrid)
+    return null;
 
-  for (const zone of (zoneGrid[x][y] ?? [])) {
-    if (booleanPointInPolygon([lon, lat], zone.geometry as any))
-      return zone.properties.tzid;
-  }
+  const x = floor(mod(lon, 360));
+  const y = floor((lat + 90));
+  const zones = zoneGrid[x][y] ?? [];
+  let timezone: string = null;
 
-  return null;
+  if (zones.length === 1)
+    timezone = zones[0].properties.tzid;
+  else
+    for (const zone of zones) {
+      if (booleanPointInPolygon([lon, lat], zone.geometry as any)) {
+        timezone = zone.properties.tzid;
+        break;
+      }
+    }
+
+  if (timezone === 'America/Nipigon' || timezone === 'America/Toronto')
+    timezone = booleanPointInPolygon([lon, lat], nipigon as any) ? 'America/Nipigon' : 'America/Toronto';
+
+  return timezone;
 }
 
 async function checkUnzip(): Promise<void> {
@@ -120,6 +162,15 @@ async function getTimezoneShapes(): Promise<FeatureCollection> {
 }
 
 function presortTimezones(timezones: FeatureCollection): void {
+  zoneGrid = [];
+
+  for (let x = 0; x < 360; ++x) {
+    zoneGrid[x] = [];
+
+    for (let y = 0; y < 180; ++y)
+      zoneGrid[x][y] = [];
+  }
+
   timezones.features.forEach(shape => {
     const bbox = getBbox(shape);
     let [lonA, latA, lonB, latB] = bbox;
@@ -127,16 +178,40 @@ function presortTimezones(timezones: FeatureCollection): void {
     if (lonA < 0) lonA += 360;
     while (lonB < lonA) lonB += 360;
 
-    const xA = floor(lonA / 15);
-    const xB = floor(lonB / 15);
-    const yA = floor((latA + 90) / 15);
-    const yB = floor((latB + 90) / 15);
+    const xA = floor(lonA);
+    const xB = floor(lonB);
+    const yA = floor(latA + 90);
+    const yB = floor(latB + 90);
 
     for (let x = xA; x <= xB; ++x) {
       for (let y = yA; y <= yB; ++y)
-        zoneGrid[x % 24][y].push(shape);
+        zoneGrid[x % 360][y].push(shape);
     }
   });
+
+  for (let x = 0; x < 360; ++x) {
+    console.log(mod2(x, 360) + '°');
+
+    for (let y = 0; y < 180; ++y) {
+      const zones = zoneGrid[x][y];
+
+      if (zones?.length > 1) {
+        const weededZones: Feature<any>[] = [];
+        const cell = polygon([[[x - 0.1, y - 90.1],
+                               [x + 1.1, y - 90.1],
+                               [x + 1.1, y - 89.9],
+                               [x - 0.1, y - 89.9],
+                               [x - 0.1, y - 90.1]]]);
+
+        for (const zone of zones) {
+          if (intersect(zone as Feature<any>, cell))
+            weededZones.push(zone);
+        }
+
+        zoneGrid[x][y] = weededZones;
+      }
+    }
+  }
 }
 
 let doList = '';
@@ -167,10 +242,14 @@ const geoNamesLookup = new Map<number, Location>();
 async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promise<void> {
   const inStream = createReadStream(file, 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
+  let zoneChanges = 0;
+  let lineCount = 0;
 
   zoneMap = {};
 
   for await (const line of lines) {
+    ++lineCount;
+
     const parts = line.split('\t').map(p => p.trim());
     const [geonames_id, , , , latitude, longitude, , , , , , , , , population, elevation0, dem] = parts.map(p => toNumber(p, null));
     const name = dequote(parts[1]);
@@ -178,11 +257,34 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
     if (!name)
       continue;
 
-    const [, , , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
+    let [, , , altNames, , , featureClass, featureCode, countryCode, , admin1, admin2, , , , , , timezone] = parts;
     const elevation = (elevation0 !== -9999 ? elevation0 : 0) || (dem !== -9999 ? dem : 0);
     const feature_code = featureClass + '.' + featureCode;
+    let timezoneModified = false;
 
     if (countryCode && timezone) {
+      if (zoneGrid) {
+        const altZone = findTimezone(latitude, longitude);
+
+        if (altZone && timezone !== altZone) {
+          const alt = Timezone.getTimezone(altZone);
+          const orig = Timezone.getTimezone(timezone);
+
+          if ((alt.aliasFor || altZone) !== (orig.aliasFor || timezone)) {
+            console.log('%s, %s, %s, %s, %s, %s -> %s', name, admin1, countryCode, latitude, longitude, timezone, altZone);
+            timezone = altZone;
+            timezoneModified = true;
+            ++zoneChanges;
+          }
+        }
+      }
+      else if (booleanPointInPolygon([longitude, latitude], nipigon as any) && timezone !== 'America/Nipigon') {
+        console.log('%s, %s, %s, %s, %s, %s -> %s', name, admin1, countryCode, latitude, longitude, timezone, 'America/Nipigon');
+        timezone = 'America/Nipigon';
+        timezoneModified = true;
+        ++zoneChanges;
+      }
+
       let zones = zoneMap[countryCode];
 
       if (!zones) {
@@ -261,6 +363,7 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
         elevation,
         population,
         timezone: timezone || findTimezone(latitude, longitude),
+        timezoneModified,
         feature_code,
         rank,
         mphone1: metaphone[0],
@@ -277,6 +380,8 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
         console.log('size:', places.length);
     }
   }
+
+  console.log('timezone modifications: %s, (%s%)', zoneChanges, (zoneChanges / lineCount * 100).toPrecision(4));
 }
 
 async function updatePrimaryTables(): Promise<void> {
