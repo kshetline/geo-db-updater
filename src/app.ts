@@ -2,7 +2,7 @@ import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { isAllUppercaseWords, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
-import { floor, mod, mod2 } from '@tubular/math';
+import { floor, mod } from '@tubular/math';
 import { spawn } from 'child_process';
 import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon, polygon, intersect } from '@turf/turf';
 import * as readline from 'readline';
@@ -13,7 +13,9 @@ import {
 } from './gazetteer';
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
-import { Timezone } from '@tubular/time';
+import ttime, { Timezone } from '@tubular/time';
+
+ttime.initTimezoneLarge();
 
 const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
 
@@ -105,27 +107,60 @@ const nipigon = {
   }
 };
 
-function findTimezone(lat: number, lon: number): string {
+function weedZones(x: number, y: number): Feature[] {
+  let zones = zoneGrid[x][y];
+
+  if (zones?.length > 1) {
+    const weededZones: Feature<any>[] = [];
+    const cell = polygon([[[x - 0.1, y - 90.1],
+                           [x + 1.1, y - 90.1],
+                           [x + 1.1, y - 89.9],
+                           [x - 0.1, y - 89.9],
+                           [x - 0.1, y - 90.1]]]);
+
+    (weededZones as any).weeded = true;
+
+    for (const zone of zones) {
+      if (intersect(zone as Feature<any>, cell))
+        weededZones.push(zone);
+    }
+
+    zones = zoneGrid[x][y] = weededZones;
+  }
+
+  return zones;
+}
+
+function findTimezone(lat: number, lon: number, preferred?: string): string {
   if (!zoneGrid)
     return null;
 
   const x = floor(mod(lon, 360));
   const y = floor((lat + 90));
-  const zones = zoneGrid[x][y] ?? [];
+  let zones = zoneGrid[x][y] ?? [];
   let timezone: string = null;
 
   if (zones.length === 1)
     timezone = zones[0].properties.tzid;
-  else
+  else {
+    if (!(zones as any).weeded)
+      zones = weedZones(x, y);
+
     for (const zone of zones) {
       if (booleanPointInPolygon([lon, lat], zone.geometry as any)) {
         timezone = zone.properties.tzid;
-        break;
+
+        if (preferred && timezone === preferred)
+          break;
       }
     }
+  }
 
   if (timezone === 'America/Nipigon' || timezone === 'America/Toronto')
-    timezone = booleanPointInPolygon([lon, lat], nipigon as any) ? 'America/Nipigon' : 'America/Toronto';
+    timezone = booleanPointInPolygon([lon, lat], nipigon as any, { ignoreBoundary: true }) ? 'America/Nipigon' : 'America/Toronto';
+
+  if (preferred && timezone !== preferred && Timezone.getAliasesForZone(timezone).includes(preferred))
+    timezone = preferred;
 
   return timezone;
 }
@@ -188,30 +223,6 @@ function presortTimezones(timezones: FeatureCollection): void {
         zoneGrid[x % 360][y].push(shape);
     }
   });
-
-  for (let x = 0; x < 360; ++x) {
-    console.log(mod2(x, 360) + '°');
-
-    for (let y = 0; y < 180; ++y) {
-      const zones = zoneGrid[x][y];
-
-      if (zones?.length > 1) {
-        const weededZones: Feature<any>[] = [];
-        const cell = polygon([[[x - 0.1, y - 90.1],
-                               [x + 1.1, y - 90.1],
-                               [x + 1.1, y - 89.9],
-                               [x - 0.1, y - 89.9],
-                               [x - 0.1, y - 90.1]]]);
-
-        for (const zone of zones) {
-          if (intersect(zone as Feature<any>, cell))
-            weededZones.push(zone);
-        }
-
-        zoneGrid[x][y] = weededZones;
-      }
-    }
-  }
 }
 
 let doList = '';
@@ -264,7 +275,7 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
 
     if (countryCode && timezone) {
       if (zoneGrid) {
-        const altZone = findTimezone(latitude, longitude);
+        const altZone = findTimezone(latitude, longitude, timezone);
 
         if (altZone && timezone !== altZone) {
           const alt = Timezone.getTimezone(altZone);
