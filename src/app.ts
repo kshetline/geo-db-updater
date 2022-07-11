@@ -157,7 +157,7 @@ function findTimezone(lat: number, lon: number, preferred?: string): string {
   }
 
   if (timezone === 'America/Nipigon' || timezone === 'America/Toronto')
-    timezone = booleanPointInPolygon([lon, lat], nipigon as any, { ignoreBoundary: true }) ? 'America/Nipigon' : 'America/Toronto';
+    timezone = booleanPointInPolygon([lon, lat], nipigon as any) ? 'America/Nipigon' : 'America/Toronto';
 
   if (preferred && timezone !== preferred && Timezone.getAliasesForZone(timezone).includes(preferred))
     timezone = preferred;
