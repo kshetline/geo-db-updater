@@ -19,6 +19,7 @@
     "@tubular/util": "^4.12.0",
     "@turf/turf": "^6.5.0",
     "by-request": "^1.3.3",
+    "geo-tz": "^7.0.2",
     "json-z": "^3.3.2",
     "mysql": "^2.18.1",
     "unidecode-plus": "^1.0.4"

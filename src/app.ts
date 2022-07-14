@@ -1,10 +1,8 @@
-import { requestJson } from 'by-request';
 import { createReadStream } from 'fs';
-import { readFile } from 'fs/promises';
 import { isAllUppercaseWords, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
-import { floor, mod } from '@tubular/math';
+import { abs, floor } from '@tubular/math';
 import { spawn } from 'child_process';
-import { Feature, FeatureCollection, bbox as getBbox, booleanPointInPolygon, polygon, intersect } from '@turf/turf';
+import { booleanPointInPolygon } from '@turf/turf';
 import * as readline from 'readline';
 import { Pool, PoolConnection } from './mysql-await-async';
 import {
@@ -14,14 +12,9 @@ import {
 import { getPossiblyCachedFile, THREE_MONTHS } from './file-util';
 import { doubleMetaphone } from './double-metaphone';
 import ttime, { Timezone } from '@tubular/time';
+import { find } from 'geo-tz';
 
 ttime.initTimezoneLarge();
-
-const FAKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:98.0) Gecko/20100101 Firefox/98.0';
-
-const TIMEZONE_RELEASE_URL = 'https://api.github.com/repos/evansiroky/timezone-boundary-builder/releases/latest';
-const TIMEZONE_SHAPES_FILE = 'cache/timezone_shapes.zip';
-const TIMEZONE_SHAPES_JSON_FILE = 'cache/timezone_shapes.json';
 
 const CITIES_15000_URL = 'https://download.geonames.org/export/dump/cities15000.zip';
 const CITIES_15000_FILE = 'cache/cities15000.zip';
@@ -70,7 +63,6 @@ export const pool = new Pool({
   database: 'skyviewcafe'
 });
 
-let zoneGrid: Feature[][][];
 const nipigon = {
   type: 'Feature',
   properties: {
@@ -107,60 +99,36 @@ const nipigon = {
   }
 };
 
-function weedZones(x: number, y: number): Feature[] {
-  let zones = zoneGrid[x][y];
+function findTimezone(lat: number, lon: number, preferred?: string, country?: string): string {
+  const timezones = find(lat, lon);
+  let timezone = timezones[0] || preferred;
 
-  if (zones?.length > 1) {
-    const weededZones: Feature<any>[] = [];
-    const cell = polygon([[[x - 0.1, y - 90.1],
-                           [x + 1.1, y - 90.1],
-                           [x + 1.1, y - 89.9],
-                           [x - 0.1, y - 89.9],
-                           [x - 0.1, y - 90.1]]]);
-
-    (weededZones as any).weeded = true;
-
-    for (const zone of zones) {
-      if (intersect(zone as Feature<any>, cell))
-        weededZones.push(zone);
-    }
-
-    zones = zoneGrid[x][y] = weededZones;
-  }
-
-  return zones;
-}
-
-function findTimezone(lat: number, lon: number, preferred?: string): string {
-  if (!zoneGrid)
-    return null;
-
-  const x = floor(mod(lon, 360));
-  const y = floor((lat + 90));
-  let zones = zoneGrid[x][y] ?? [];
-  let timezone: string = null;
-
-  if (zones.length === 1)
-    timezone = zones[0].properties.tzid;
-  else {
-    if (!(zones as any).weeded)
-      zones = weedZones(x, y);
-
-    for (const zone of zones) {
-      if (booleanPointInPolygon([lon, lat], zone.geometry as any)) {
-        timezone = zone.properties.tzid;
-
-        if (preferred && timezone === preferred)
-          break;
-      }
-    }
-  }
+  if (preferred && timezone?.startsWith('Etc/'))
+    timezone = preferred;
+  else if (timezone && preferred && timezone !== preferred && timezones[1] === preferred)
+    timezone = preferred;
 
   if (timezone === 'America/Nipigon' || timezone === 'America/Toronto')
     timezone = booleanPointInPolygon([lon, lat], nipigon as any) ? 'America/Nipigon' : 'America/Toronto';
 
   if (preferred && timezone !== preferred && Timezone.getAliasesForZone(timezone).includes(preferred))
     timezone = preferred;
+
+  if (country && !Timezone.getCountries(timezone)?.has(country) && abs(lat) < 89.9 && abs(lon) < 179.9) {
+    zoneCheck:
+    for (const delta of [0.01, 0.1]) {
+      for (let i = 0; i < 4; ++i) {
+        const nearZones = find(lat + (i < 2 ? -delta : delta), lon + (i % 2 === 0 ? -delta : delta)) || [];
+
+        for (const nearZone of nearZones) {
+          if (nearZone && nearZone !== timezone && Timezone.getCountries(nearZone)?.has(country)) {
+            timezone = nearZone;
+            break zoneCheck;
+          }
+        }
+      }
+    }
+  }
 
   return timezone;
 }
@@ -173,56 +141,6 @@ async function checkUnzip(): Promise<void> {
         zipProc.stdout.once('end', () => resolve(true));
       }))
     throw new Error('unzip command not available');
-}
-
-async function getTimezoneShapes(): Promise<FeatureCollection> {
-  const options = { headers: { 'User-Agent': FAKE_USER_AGENT } } as any;
-  const gitHubToken = process.env.GITHUB_TOKEN;
-
-  if (gitHubToken)
-    options.headers.Authorization = 'token ' + gitHubToken;
-
-  const releaseInfo = await requestJson(TIMEZONE_RELEASE_URL, options);
-  const asset = releaseInfo?.assets?.find((asset: any) => asset.name === 'timezones-with-oceans.geojson.zip');
-
-  if (!asset.browser_download_url)
-    throw new Error('Cannot obtain timezone shapes release info');
-
-  await getPossiblyCachedFile(TIMEZONE_SHAPES_FILE, asset.browser_download_url, 'Timezone shapes',
-    { maxCacheAge: THREE_MONTHS, unzipPath: TIMEZONE_SHAPES_JSON_FILE });
-
-  const shapesJson = await readFile(TIMEZONE_SHAPES_JSON_FILE, 'utf8');
-
-  return JSON.parse(shapesJson) as FeatureCollection;
-}
-
-function presortTimezones(timezones: FeatureCollection): void {
-  zoneGrid = [];
-
-  for (let x = 0; x < 360; ++x) {
-    zoneGrid[x] = [];
-
-    for (let y = 0; y < 180; ++y)
-      zoneGrid[x][y] = [];
-  }
-
-  timezones.features.forEach(shape => {
-    const bbox = getBbox(shape);
-    let [lonA, latA, lonB, latB] = bbox;
-
-    if (lonA < 0) lonA += 360;
-    while (lonB < lonA) lonB += 360;
-
-    const xA = floor(lonA);
-    const xB = floor(lonB);
-    const yA = floor(latA + 90);
-    const yB = floor(latB + 90);
-
-    for (let x = xA; x <= xB; ++x) {
-      for (let y = yA; y <= yB; ++y)
-        zoneGrid[x % 360][y].push(shape);
-    }
-  });
 }
 
 let doList = '';
@@ -247,6 +165,7 @@ async function getGeoData(): Promise<void> {
 }
 
 const places: Location[] = [];
+const buildZoneGrid = true;
 let zoneMap: Record<string, Record<string, number>>;
 const geoNamesLookup = new Map<number, Location>();
 
@@ -274,8 +193,8 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
     let timezoneModified = false;
 
     if (countryCode && timezone) {
-      if (zoneGrid) {
-        const altZone = findTimezone(latitude, longitude, timezone);
+      if (buildZoneGrid) {
+        const altZone = findTimezone(latitude, longitude, timezone, countryCode);
 
         if (altZone && timezone !== altZone) {
           const alt = Timezone.getTimezone(altZone);
@@ -768,13 +687,6 @@ async function buildZoneLookup(): Promise<void> {
 
   try {
     await checkUnzip();
-
-    if (shouldDo('shapes') || shouldDo('zones')) {
-      const timezones = await getTimezoneShapes();
-
-      timezones.features = timezones.features.filter(shape => !shape.properties.tzid.startsWith('Etc/'));
-      presortTimezones(timezones);
-    }
 
     await getGeoData();
     await initGazetteer();
