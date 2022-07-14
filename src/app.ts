@@ -1,5 +1,5 @@
 import { createReadStream } from 'fs';
-import { isAllUppercaseWords, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
+import { isAllUppercaseWords, isEqual, keyCount, regex, regexEscape, toBoolean, toNumber, toTitleCase } from '@tubular/util';
 import { abs, floor } from '@tubular/math';
 import { spawn } from 'child_process';
 import { booleanPointInPolygon } from '@turf/turf';
@@ -50,6 +50,7 @@ interface Location {
   elevation: number;
   population: number;
   timezone: string;
+  timezoneModified: boolean;
   feature_code: string;
   rank: number;
   mphone1?: string;
@@ -103,7 +104,9 @@ function findTimezone(lat: number, lon: number, preferred?: string, country?: st
   const timezones = find(lat, lon);
   let timezone = timezones[0] || preferred;
 
-  if (preferred && timezone?.startsWith('Etc/'))
+  if (preferred && country === 'AQ')
+    return preferred;
+  else if (preferred && timezone?.startsWith('Etc/'))
     timezone = preferred;
   else if (timezone && preferred && timezone !== preferred && timezones[1] === preferred)
     timezone = preferred;
@@ -120,7 +123,10 @@ function findTimezone(lat: number, lon: number, preferred?: string, country?: st
       for (let i = 0; i < 4; ++i) {
         const nearZones = find(lat + (i < 2 ? -delta : delta), lon + (i % 2 === 0 ? -delta : delta)) || [];
 
-        for (const nearZone of nearZones) {
+        for (let nearZone of nearZones) {
+          if (nearZone === 'America/Nipigon' || nearZone === 'America/Toronto')
+            nearZone = booleanPointInPolygon([lon, lat], nipigon as any) ? 'America/Nipigon' : 'America/Toronto';
+
           if (nearZone && nearZone !== timezone && Timezone.getCountries(nearZone)?.has(country)) {
             timezone = nearZone;
             break zoneCheck;
@@ -165,17 +171,16 @@ async function getGeoData(): Promise<void> {
 }
 
 const places: Location[] = [];
-const buildZoneGrid = true;
-let zoneMap: Record<string, Record<string, number>>;
+const zoneMap: Record<string, Record<string, number>> = {};
 const geoNamesLookup = new Map<number, Location>();
 
-async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promise<void> {
+async function readGeoData(file: string, level = 0, zoneCheckOnly = false): Promise<void> {
   const inStream = createReadStream(file, 'utf8');
   const lines = readline.createInterface({ input: inStream, crlfDelay: Infinity });
   let zoneChanges = 0;
   let lineCount = 0;
-
-  zoneMap = {};
+  const buildZoneMap = isEqual(zoneMap, {});
+  let connection: PoolConnection;
 
   for await (const line of lines) {
     ++lineCount;
@@ -193,50 +198,40 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
     let timezoneModified = false;
 
     if (countryCode && timezone) {
-      if (buildZoneGrid) {
-        const altZone = findTimezone(latitude, longitude, timezone, countryCode);
+      const altZone = findTimezone(latitude, longitude, timezone, countryCode);
 
-        if (altZone && timezone !== altZone) {
-          const alt = Timezone.getTimezone(altZone);
-          const orig = Timezone.getTimezone(timezone);
+      if (altZone && timezone !== altZone) {
+        const alt = Timezone.getTimezone(altZone);
+        const orig = Timezone.getTimezone(timezone);
 
-          if ((alt.aliasFor || altZone) !== (orig.aliasFor || timezone)) {
-            console.log('%s, %s, %s, %s, %s, %s -> %s', name, admin1, countryCode, latitude, longitude, timezone, altZone);
-            timezone = altZone;
-            timezoneModified = true;
-            ++zoneChanges;
+        if ((alt.aliasFor || altZone) !== (orig.aliasFor || timezone)) {
+          console.log('%s, %s, %s, %s, %s, %s, %s -> %s', name, admin1, countryCode, feature_code, latitude, longitude, timezone, altZone);
+          timezone = altZone;
+          timezoneModified = true;
+          ++zoneChanges;
+
+          if (zoneCheckOnly) {
+            if (!connection)
+              connection = await pool.getConnection();
+
+            await connection.query('UPDATE gazetteer SET timezone = ?, tzu = 1, edited = 1 WHERE ' +
+              'geonames_id = ? AND timezone != ?', [timezone, geonames_id, timezone]);
           }
         }
       }
-      else if (booleanPointInPolygon([longitude, latitude], nipigon as any) && timezone !== 'America/Nipigon') {
-        console.log('%s, %s, %s, %s, %s, %s -> %s', name, admin1, countryCode, latitude, longitude, timezone, 'America/Nipigon');
-        timezone = 'America/Nipigon';
-        timezoneModified = true;
-        ++zoneChanges;
-      }
 
-      let zones = zoneMap[countryCode];
-
-      if (!zones) {
-        zones = {};
-        zoneMap[countryCode] = zones;
-      }
-
-      zones[timezone] = (zones[timezone] || 0) + 1;
-
-      if (admin1 && keyCount(zones) > 1) {
-        let key = countryCode + '.' + admin1;
-        zones = zoneMap[key];
+      if (buildZoneMap) {
+        let zones = zoneMap[countryCode];
 
         if (!zones) {
           zones = {};
-          zoneMap[key] = zones;
+          zoneMap[countryCode] = zones;
         }
 
         zones[timezone] = (zones[timezone] || 0) + 1;
 
-        if (admin2 && keyCount(zones) > 1) {
-          key += '.' + admin2;
+        if (admin1 && keyCount(zones) > 1) {
+          let key = countryCode + '.' + admin1;
           zones = zoneMap[key];
 
           if (!zones) {
@@ -245,11 +240,23 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
           }
 
           zones[timezone] = (zones[timezone] || 0) + 1;
+
+          if (admin2 && keyCount(zones) > 1) {
+            key += '.' + admin2;
+            zones = zoneMap[key];
+
+            if (!zones) {
+              zones = {};
+              zoneMap[key] = zones;
+            }
+
+            zones[timezone] = (zones[timezone] || 0) + 1;
+          }
         }
       }
     }
 
-    if (zoneMapOnly)
+    if (zoneCheckOnly)
       continue;
 
     if (!name || name.includes(',') || geoNamesLookup.has(geonames_id) || admin1 === '0Z' ||
@@ -311,6 +318,7 @@ async function readGeoData(file: string, level = 0, zoneMapOnly = false): Promis
     }
   }
 
+  connection?.release();
   console.log('timezone modifications: %s, (%s%)', zoneChanges, (zoneChanges / lineCount * 100).toPrecision(4));
 }
 
@@ -377,13 +385,13 @@ async function updatePrimaryTables(): Promise<void> {
 
     for (const loc of places) {
       const query = `INSERT INTO gazetteer
-        (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone,
+        (key_name, name, admin2, admin1, country, latitude, longitude, elevation, population, timezone, tzu,
          rank, feature_code, mphone1, mphone2, source, geonames_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            latitude = ?, longitude = ?, elevation = ?, population = ?, timezone = ?, rank = ?, source = ?,
            geonames_id = ?, time_stamp = now()`;
       const values = [loc.key_name, loc.name, loc.admin2, loc.admin1, loc.country,
-                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone,
+                      loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone, +loc.timezoneModified,
                       loc.rank, loc.feature_code, loc.mphone1, loc.mphone2, loc.source, loc.geonames_id,
                       loc.latitude, loc.longitude, loc.elevation, loc.population, loc.timezone,
                       loc.rank, loc.source, loc.geonames_id];
@@ -655,11 +663,11 @@ async function legacyItems(): Promise<void> {
   connection?.release();
 }
 
-async function buildZoneLookup(): Promise<void> {
+async function performTimezoneCorrections(): Promise<void> {
   let connection: PoolConnection;
 
   try {
-    if (!zoneMap)
+    if (isEqual(zoneMap, {}))
       await readGeoData(ALL_COUNTRIES_TEXT_FILE, 1, true);
 
     const locations = Object.keys(zoneMap).sort();
@@ -670,7 +678,7 @@ async function buildZoneLookup(): Promise<void> {
       summary[location] = keys.map(key => `${key} (${zoneMap[location][key]})`).join(', ');
     }
 
-    console.log(JSON.stringify(summary, null, 2));
+    // console.log(JSON.stringify(summary, null, 2));
   }
   catch (err) {
     console.error(err.toString());
@@ -707,7 +715,7 @@ async function buildZoneLookup(): Promise<void> {
       await legacyItems();
 
     if (shouldDo('zones'))
-      await buildZoneLookup();
+      await performTimezoneCorrections();
 
     process.exit(0);
   }
